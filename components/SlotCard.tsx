@@ -34,9 +34,18 @@ export function SlotCard({ slot, onClick }: Props) {
     const check = () => {
       if (!slot.check_in_time || !slot.check_out_time) { setIsFinished(false); return }
       const now = new Date()
-      const nowStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-      const checkIn = slot.check_in_time.slice(0, 5)
-      setIsFinished(nowStr >= checkIn && nowStr >= slot.check_out_time.slice(0, 5))
+      const nowMin = now.getHours() * 60 + now.getMinutes()
+      const [inH, inM] = slot.check_in_time.slice(0, 5).split(':').map(Number)
+      const [outH, outM] = slot.check_out_time.slice(0, 5).split(':').map(Number)
+      let inMin = inH * 60 + inM
+      let outMin = outH * 60 + outM
+      let nowAdj = nowMin
+      // Midnight crossover: if check_out < check_in, it crosses midnight
+      if (outMin < inMin) {
+        outMin += 24 * 60
+        if (nowAdj < inMin) nowAdj += 24 * 60
+      }
+      setIsFinished(nowAdj >= inMin && nowAdj >= outMin)
     }
     check()
     const interval = setInterval(check, 30000) // check every 30s

@@ -23,10 +23,20 @@ export function TherapistColumn({ therapist, onAddSlot, onEditSlot, onDropSlot, 
 
   // Check if therapist is currently serving a customer
   const now = new Date()
-  const nowStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-  const isServing = therapist.slots.some(s =>
-    s.check_in_time && s.check_out_time && nowStr >= s.check_in_time.slice(0, 5) && nowStr < s.check_out_time.slice(0, 5)
-  )
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const isServing = therapist.slots.some(s => {
+    if (!s.check_in_time || !s.check_out_time) return false
+    const [inH, inM] = s.check_in_time.slice(0, 5).split(':').map(Number)
+    const [outH, outM] = s.check_out_time.slice(0, 5).split(':').map(Number)
+    let inMin = inH * 60 + inM
+    let outMin = outH * 60 + outM
+    let adj = nowMin
+    if (outMin < inMin) {
+      outMin += 24 * 60
+      if (adj < inMin) adj += 24 * 60
+    }
+    return adj >= inMin && adj < outMin
+  })
 
   // --- Column drag (whole column is draggable via header) ---
   const handleHeaderDragStart = (e: DragEvent) => {
