@@ -32,15 +32,16 @@ export function SlotCard({ slot, onClick }: Props) {
   const [isFinished, setIsFinished] = useState(false)
   useEffect(() => {
     const check = () => {
-      if (!slot.check_out_time) { setIsFinished(false); return }
+      if (!slot.check_in_time || !slot.check_out_time) { setIsFinished(false); return }
       const now = new Date()
       const nowStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-      setIsFinished(nowStr >= slot.check_out_time.slice(0, 5))
+      const checkIn = slot.check_in_time.slice(0, 5)
+      setIsFinished(nowStr >= checkIn && nowStr >= slot.check_out_time.slice(0, 5))
     }
     check()
     const interval = setInterval(check, 30000) // check every 30s
     return () => clearInterval(interval)
-  }, [slot.check_out_time])
+  }, [slot.check_in_time, slot.check_out_time])
 
   const handleDragStart = (e: DragEvent) => {
     e.dataTransfer.setData('application/slot-id', slot.id)
