@@ -4,7 +4,7 @@ import { DragEvent, useState } from 'react'
 import { TherapistWithSlots, ScheduleSlot } from '@/lib/types'
 import { SlotCard } from './SlotCard'
 
-const MAX_SLOTS = 5
+const MAX_SLOTS = 7
 
 type DropSide = 'left' | 'right' | null
 
