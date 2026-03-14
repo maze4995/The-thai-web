@@ -1,0 +1,136 @@
+'use client'
+
+import { DragEvent, useState, useEffect } from 'react'
+import { ScheduleSlot } from '@/lib/types'
+import { supabase } from '@/lib/supabase'
+import { formatTime, formatPrice, getPhoneLastFour, getServiceDuration, addMinutesToTime, PAYMENT_LABELS, PAYMENT_COLORS } from '@/lib/utils'
+
+interface Props {
+  slot: ScheduleSlot
+  onClick: () => void
+}
+
+/** Round current time up to next multiple of 10 minutes */
+function roundUpTo10(date: Date): string {
+  const h = date.getHours()
+  const m = date.getMinutes()
+  const rounded = Math.ceil(m / 10) * 10
+  if (rounded >= 60) {
+    return `${String((h + 1) % 24).padStart(2, '0')}:00`
+  }
+  return `${String(h).padStart(2, '0')}:${String(rounded).padStart(2, '0')}`
+}
+
+export function SlotCard({ slot, onClick }: Props) {
+  const phone = getPhoneLastFour(slot.customer_phone)
+  const paymentColor = PAYMENT_COLORS[slot.payment_type] ?? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600'
+  const paymentLabel = PAYMENT_LABELS[slot.payment_type] ?? slot.payment_type
+
+  const hasCheckedIn = !!slot.check_in_time
+
+  // Check if service is finished (check_out_time has passed)
+  const [isFinished, setIsFinished] = useState(false)
+  useEffect(() => {
+    const check = () => {
+      if (!slot.check_out_time) { setIsFinished(false); return }
+      const now = new Date()
+      const nowStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      setIsFinished(nowStr >= slot.check_out_time.slice(0, 5))
+    }
+    check()
+    const interval = setInterval(check, 30000) // check every 30s
+    return () => clearInterval(interval)
+  }, [slot.check_out_time])
+
+  const handleDragStart = (e: DragEvent) => {
+    e.dataTransfer.setData('application/slot-id', slot.id)
+    e.dataTransfer.effectAllowed = 'move'
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5'
+    }
+  }
+
+  const handleDragEnd = (e: DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1'
+    }
+  }
+
+  const handleArrival = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const now = new Date()
+    const checkIn = roundUpTo10(now)
+    const duration = getServiceDuration(slot.service_name)
+    const checkOut = addMinutesToTime(checkIn, duration)
+    await supabase.from('schedule_slots').update({
+      check_in_time: checkIn,
+      check_out_time: checkOut,
+    }).eq('id', slot.id)
+  }
+
+  return (
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onClick={onClick}
+      className="w-full text-left rounded-lg p-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing group border bg-slate-50 dark:bg-[#1e2535] hover:bg-slate-100 dark:hover:bg-[#252d40] border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-500"
+    >
+      {/* Row 1: Phone + Room + Finished badge */}
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5">
+          <span className="text-slate-900 dark:text-slate-100 font-bold text-sm tracking-wider">{phone}</span>
+          {isFinished && (
+            <span className="text-[10px] font-bold tracking-wider bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded">
+              관리완료
+            </span>
+          )}
+        </div>
+        <span className="text-xs font-semibold rounded px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+          {slot.room_number}번방
+        </span>
+      </div>
+
+      {/* Row 2: Service + Price */}
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm">{slot.service_name}</span>
+        <span className={`text-xs font-medium px-1.5 py-0.5 rounded border ${paymentColor}`}>
+          {paymentLabel} {formatPrice(slot.service_price)}
+        </span>
+      </div>
+
+      {/* Row 3: Time info (vertical) */}
+      <div className="flex flex-col gap-0.5 text-xs">
+        {slot.reserved_time && (
+          <div className="flex items-center justify-between">
+            <span className="text-amber-400 dark:text-amber-500 w-6">예약</span>
+            <span className="text-amber-500 dark:text-amber-400 font-medium">{formatTime(slot.reserved_time)}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <span className="text-slate-400 dark:text-slate-500 w-6">입</span>
+          <span className="text-slate-600 dark:text-slate-300 font-medium">{formatTime(slot.check_in_time)}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-slate-400 dark:text-slate-500 w-6">출</span>
+          <span className="text-slate-600 dark:text-slate-300 font-medium">{formatTime(slot.check_out_time)}</span>
+        </div>
+      </div>
+
+      {/* Row 4: Memo */}
+      <div className="mt-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-700/40">
+        <span className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{slot.memo || '\u00A0'}</span>
+      </div>
+
+      {/* Arrival button - shown only when no check-in time */}
+      {!hasCheckedIn && (
+        <button
+          onClick={handleArrival}
+          className="w-full mt-2 py-1.5 bg-amber-500 hover:bg-amber-400 dark:bg-amber-600 dark:hover:bg-amber-500 text-white text-xs font-bold rounded-md transition-colors"
+        >
+          손님도착
+        </button>
+      )}
+    </div>
+  )
+}
