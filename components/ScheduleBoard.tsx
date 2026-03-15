@@ -62,106 +62,105 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
 
   // Track processed reservation IDs to prevent duplicates
   const processedReservations = useRef(new Set<string>())
+  // Lock to prevent concurrent auto-assign
+  const assigningLock = useRef(false)
+
+  // Use ref for fetchData so the realtime effect doesn't re-subscribe
+  const fetchDataRef = useRef(fetchData)
+  useEffect(() => { fetchDataRef.current = fetchData }, [fetchData])
 
   // Auto-assign reservation to the therapist with fewest slots (by display_order)
-  const autoAssignReservation = useCallback(async (reservation: Reservation) => {
-    // Prevent duplicate processing from rapid INSERT+UPDATE events
+  const autoAssignReservation = async (reservation: Reservation) => {
+    // Prevent duplicate processing
     if (processedReservations.current.has(reservation.id)) return
     processedReservations.current.add(reservation.id)
 
-    const currentDate = dateRef.current
-    // Business day: 06:00 ~ next day 05:59
-    if (!isReservationInBusinessDay(reservation.reserved_date, reservation.reserved_time, currentDate)) return
-    // Mobile app doesn't set status on INSERT (defaults to '예약확정')
-    // Accept null/undefined status as confirmed, reject only explicit cancellations
-    if (reservation.status && reservation.status !== '예약확정') return
-
-    // Check if slot already exists for this reservation (in local state)
-    const currentSlots = slotsRef.current
-    if (currentSlots.some(s => s.reservation_id === reservation.id)) return
-
-    // Check if slot already exists in DB
-    const { data: existing } = await supabase
-      .from('schedule_slots')
-      .select('id')
-      .eq('reservation_id', reservation.id)
-      .limit(1)
-    if (existing && existing.length > 0) return
-
-    // Get present therapists sorted by display_order
-    const currentAttendance = attendanceRef.current
-    const currentTherapists = therapistsRef.current
-    const presentIds = new Set(
-      currentAttendance.filter(a => a.is_present).map(a => a.therapist_id)
-    )
-    const present = currentTherapists
-      .filter(t => presentIds.has(t.id))
-      .sort((a, b) => a.display_order - b.display_order)
-
-    if (present.length === 0) return
-
-    // Find therapist with fewest slots (ties broken by display_order)
-    const slotCounts = new Map<string, number>()
-    for (const t of present) slotCounts.set(t.id, 0)
-    for (const s of currentSlots) {
-      const prev = slotCounts.get(s.therapist_id)
-      if (prev !== undefined) slotCounts.set(s.therapist_id, prev + 1)
+    // Wait for any ongoing assignment to finish
+    while (assigningLock.current) {
+      await new Promise(r => setTimeout(r, 100))
     }
+    assigningLock.current = true
 
-    const target = present.find(t => (slotCounts.get(t.id) ?? 0) < MAX_SLOTS)
-    if (!target) return // All therapists full
+    try {
+      const currentDate = dateRef.current
+      if (!isReservationInBusinessDay(reservation.reserved_date, reservation.reserved_time, currentDate)) return
+      if (reservation.status && reservation.status !== '예약확정') return
 
-    // Sort present therapists by slot count, then display_order
-    const sorted = [...present]
-      .filter(t => (slotCounts.get(t.id) ?? 0) < MAX_SLOTS)
-      .sort((a, b) => {
-        const countDiff = (slotCounts.get(a.id) ?? 0) - (slotCounts.get(b.id) ?? 0)
-        if (countDiff !== 0) return countDiff
-        return a.display_order - b.display_order
+      // Check if slot already exists in DB (single source of truth)
+      const { data: existing } = await supabase
+        .from('schedule_slots')
+        .select('id')
+        .eq('reservation_id', reservation.id)
+        .limit(1)
+      if (existing && existing.length > 0) return
+
+      const currentAttendance = attendanceRef.current
+      const currentTherapists = therapistsRef.current
+      const currentSlots = slotsRef.current
+      const presentIds = new Set(
+        currentAttendance.filter(a => a.is_present).map(a => a.therapist_id)
+      )
+      const present = currentTherapists
+        .filter(t => presentIds.has(t.id))
+        .sort((a, b) => a.display_order - b.display_order)
+
+      if (present.length === 0) return
+
+      const slotCounts = new Map<string, number>()
+      for (const t of present) slotCounts.set(t.id, 0)
+      for (const s of currentSlots) {
+        const prev = slotCounts.get(s.therapist_id)
+        if (prev !== undefined) slotCounts.set(s.therapist_id, prev + 1)
+      }
+
+      const sorted = [...present]
+        .filter(t => (slotCounts.get(t.id) ?? 0) < MAX_SLOTS)
+        .sort((a, b) => {
+          const countDiff = (slotCounts.get(a.id) ?? 0) - (slotCounts.get(b.id) ?? 0)
+          if (countDiff !== 0) return countDiff
+          return a.display_order - b.display_order
+        })
+
+      const assignTo = sorted[0]
+      if (!assignTo) return
+
+      const mappedService = mapServiceName(reservation.service_name ?? '')
+      const price = getServicePrice(mappedService, reservation.customer_name ?? '')
+      const usedRooms = currentSlots.map(s => s.room_number)
+      const roomNumber = getAvailableRoom(mappedService, usedRooms)
+      const autoMemo = getAutoMemo(reservation.customer_name ?? '')
+      const resMemo = reservation.memo ?? ''
+      const combinedMemo = [autoMemo, resMemo].filter(Boolean).join(' ')
+
+      await supabase.from('schedule_slots').insert({
+        therapist_id: assignTo.id,
+        work_date: currentDate,
+        reservation_id: reservation.id,
+        customer_name: reservation.customer_name,
+        customer_phone: reservation.customer_phone,
+        service_name: mappedService,
+        service_price: price,
+        room_number: roomNumber,
+        reserved_time: reservation.reserved_time?.slice(0, 5) ?? null,
+        check_in_time: null,
+        check_out_time: null,
+        payment_type: 'cash',
+        memo: combinedMemo,
       })
+    } finally {
+      assigningLock.current = false
+    }
+  }
 
-    const assignTo = sorted[0]
-    if (!assignTo) return
-
-    const mappedService = mapServiceName(reservation.service_name ?? '')
-    const price = getServicePrice(mappedService, reservation.customer_name ?? '')
-
-    // Find available room based on service type and currently used rooms
-    const usedRooms = currentSlots.map(s => s.room_number)
-    const roomNumber = getAvailableRoom(mappedService, usedRooms)
-
-    // Auto-generate memo from customer name patterns
-    const autoMemo = getAutoMemo(reservation.customer_name ?? '')
-    const resMemo = reservation.memo ?? ''
-    const combinedMemo = [autoMemo, resMemo].filter(Boolean).join(' ')
-
-    // check_in_time / check_out_time are set when "손님도착" is clicked, NOT from reserved_time
-    await supabase.from('schedule_slots').insert({
-      therapist_id: assignTo.id,
-      work_date: currentDate,
-      reservation_id: reservation.id,
-      customer_name: reservation.customer_name,
-      customer_phone: reservation.customer_phone,
-      service_name: mappedService,
-      service_price: price,
-      room_number: roomNumber,
-      reserved_time: reservation.reserved_time?.slice(0, 5) ?? null,
-      check_in_time: null,
-      check_out_time: null,
-      payment_type: 'cash',
-      memo: combinedMemo,
-    })
-  }, [])
-
-  // Realtime subscriptions
+  // Realtime subscriptions - runs once on mount, uses refs for current values
   useEffect(() => {
     const channel = supabase
       .channel('schedule-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_slots' }, () => {
-        fetchData(date)
+        fetchDataRef.current(dateRef.current)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_attendance' }, () => {
-        fetchData(date)
+        fetchDataRef.current(dateRef.current)
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reservations' }, (payload) => {
         autoAssignReservation(payload.new as Reservation)
@@ -171,7 +170,8 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [date, fetchData, autoAssignReservation])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const navigateDate = (delta: number) => {
     const d = new Date(date + 'T00:00:00')
