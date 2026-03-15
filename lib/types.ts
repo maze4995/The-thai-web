@@ -12,6 +12,7 @@ export interface DailyAttendance {
   therapist_id: string
   work_date: string
   is_present: boolean
+  display_order: number
 }
 
 export interface ScheduleSlot {

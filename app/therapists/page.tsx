@@ -46,10 +46,15 @@ export default function TherapistsPage() {
         .update({ is_present: !att.is_present })
         .eq('id', att.id)
     } else {
+      // New attendance: assign display_order at end of present list
+      const maxOrder = attendance
+        .filter(a => a.is_present)
+        .reduce((max, a) => Math.max(max, a.display_order ?? 0), -1)
       await supabase.from('daily_attendance').insert({
         therapist_id: therapist.id,
         work_date: today,
         is_present: true,
+        display_order: maxOrder + 1,
       })
     }
     fetchData()

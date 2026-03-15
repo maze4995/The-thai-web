@@ -97,12 +97,11 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       const currentAttendance = attendanceRef.current
       const currentTherapists = therapistsRef.current
       const currentSlots = slotsRef.current
-      const presentIds = new Set(
-        currentAttendance.filter(a => a.is_present).map(a => a.therapist_id)
-      )
+      const presentAttendance = currentAttendance.filter(a => a.is_present)
+      const attendanceOrder = new Map(presentAttendance.map(a => [a.therapist_id, a.display_order ?? 0]))
       const present = currentTherapists
-        .filter(t => presentIds.has(t.id))
-        .sort((a, b) => a.display_order - b.display_order)
+        .filter(t => attendanceOrder.has(t.id))
+        .sort((a, b) => (attendanceOrder.get(a.id) ?? 0) - (attendanceOrder.get(b.id) ?? 0))
 
       if (present.length === 0) return
 
@@ -186,6 +185,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       const att = attendance.find(a => a.therapist_id === t.id)
       return {
         ...t,
+        display_order: att?.display_order ?? t.display_order,
         is_present: att?.is_present ?? false,
         attendance_id: att?.id ?? null,
         slots: slots
@@ -198,6 +198,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       }
     })
     .filter(t => t.is_present)
+    .sort((a, b) => a.display_order - b.display_order)
 
   const isToday = date === toDateString(new Date())
   const dateObj = new Date(date + 'T00:00:00')
@@ -230,29 +231,37 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     await supabase.from('schedule_slots').update({ therapist_id: targetTherapistId }).eq('id', slotId)
   }
 
-  // Drag & drop: reorder therapist columns (insert at position)
+  // Drag & drop: reorder therapist columns (insert at position) — per-date via daily_attendance
   const handleDropColumn = async (draggedId: string, targetId: string, side: 'left' | 'right') => {
-    const sorted = [...therapists].sort((a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name))
-    const draggedIdx = sorted.findIndex(t => t.id === draggedId)
-    const targetIdx = sorted.findIndex(t => t.id === targetId)
+    // Work with present therapists sorted by current display_order
+    const present = [...presentTherapists].sort((a, b) => a.display_order - b.display_order)
+    const draggedIdx = present.findIndex(t => t.id === draggedId)
+    const targetIdx = present.findIndex(t => t.id === targetId)
     if (draggedIdx === -1 || targetIdx === -1 || draggedIdx === targetIdx) return
 
     // Remove dragged, insert at new position
-    const reordered = sorted.filter(t => t.id !== draggedId)
+    const reordered = present.filter(t => t.id !== draggedId)
     let insertIdx = reordered.findIndex(t => t.id === targetId)
     if (side === 'right') insertIdx += 1
-    reordered.splice(insertIdx, 0, sorted[draggedIdx])
+    reordered.splice(insertIdx, 0, present[draggedIdx])
 
-    // Assign sequential display_order
-    const updated = reordered.map((t, i) => ({ ...t, display_order: i }))
+    // Assign sequential display_order and update attendance records
+    const updatedAttendance = attendance.map(a => {
+      const newIdx = reordered.findIndex(t => t.id === a.therapist_id)
+      if (newIdx !== -1) return { ...a, display_order: newIdx }
+      return a
+    })
 
     // Optimistic update
-    setTherapists(updated)
+    setAttendance(updatedAttendance)
 
-    // Persist only changed ones
-    const updates = updated.filter((t, i) => sorted.find(s => s.id === t.id)?.display_order !== i)
+    // Persist to daily_attendance
+    const toUpdate = updatedAttendance.filter(a => {
+      const old = attendance.find(o => o.id === a.id)
+      return old && old.display_order !== a.display_order
+    })
     await Promise.all(
-      updates.map(t => supabase.from('therapists').update({ display_order: t.display_order }).eq('id', t.id))
+      toUpdate.map(a => supabase.from('daily_attendance').update({ display_order: a.display_order }).eq('id', a.id))
     )
   }
 
