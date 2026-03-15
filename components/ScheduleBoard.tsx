@@ -6,7 +6,7 @@ import { Therapist, DailyAttendance, ScheduleSlot, TherapistWithSlots, Reservati
 import { TherapistColumn } from './TherapistColumn'
 import { SummaryFooter } from './SummaryFooter'
 import { SlotModal } from './SlotModal'
-import { formatDate, toDateString, mapServiceName, getServicePrice, getServiceDuration, addMinutesToTime, getAvailableRoom, isReservationInBusinessDay, getAutoMemo } from '@/lib/utils'
+import { formatDate, toDateString, getBusinessDate, mapServiceName, getServicePrice, getServiceDuration, addMinutesToTime, getAvailableRoom, isReservationInBusinessDay, getAutoMemo } from '@/lib/utils'
 import { useTheme } from './ThemeProvider'
 
 const MAX_SLOTS = 5
@@ -158,7 +158,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     setDate(toDateString(d))
   }
 
-  const goToToday = () => setDate(toDateString(new Date()))
+  const goToToday = () => setDate(getBusinessDate(new Date()))
 
   const presentTherapists: TherapistWithSlots[] = therapists
     .map(t => {
