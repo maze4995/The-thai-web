@@ -37,6 +37,15 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     setSlots(slotsRes.data ?? [])
   }, [])
 
+  // On mount, always reset to today's business date
+  useEffect(() => {
+    const today = getBusinessDate(new Date())
+    if (date !== today) {
+      setDate(today)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     fetchData(date)
   }, [date, fetchData])
