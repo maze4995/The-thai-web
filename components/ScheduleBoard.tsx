@@ -60,8 +60,15 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   useEffect(() => { slotsRef.current = slots }, [slots])
   useEffect(() => { dateRef.current = date }, [date])
 
+  // Track processed reservation IDs to prevent duplicates
+  const processedReservations = useRef(new Set<string>())
+
   // Auto-assign reservation to the therapist with fewest slots (by display_order)
   const autoAssignReservation = useCallback(async (reservation: Reservation) => {
+    // Prevent duplicate processing from rapid INSERT+UPDATE events
+    if (processedReservations.current.has(reservation.id)) return
+    processedReservations.current.add(reservation.id)
+
     const currentDate = dateRef.current
     // Business day: 06:00 ~ next day 05:59
     if (!isReservationInBusinessDay(reservation.reserved_date, reservation.reserved_time, currentDate)) return
@@ -69,9 +76,17 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     // Accept null/undefined status as confirmed, reject only explicit cancellations
     if (reservation.status && reservation.status !== '예약확정') return
 
-    // Check if slot already exists for this reservation
+    // Check if slot already exists for this reservation (in local state)
     const currentSlots = slotsRef.current
     if (currentSlots.some(s => s.reservation_id === reservation.id)) return
+
+    // Check if slot already exists in DB
+    const { data: existing } = await supabase
+      .from('schedule_slots')
+      .select('id')
+      .eq('reservation_id', reservation.id)
+      .limit(1)
+    if (existing && existing.length > 0) return
 
     // Get present therapists sorted by display_order
     const currentAttendance = attendanceRef.current
@@ -149,9 +164,6 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         fetchData(date)
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reservations' }, (payload) => {
-        autoAssignReservation(payload.new as Reservation)
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'reservations' }, (payload) => {
         autoAssignReservation(payload.new as Reservation)
       })
       .subscribe()
