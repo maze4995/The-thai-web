@@ -23,23 +23,21 @@ export function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, on
   const [slotOver, setSlotOver] = useState(false)
   const [columnDropSide, setColumnDropSide] = useState<DropSide>(null)
 
+  // Normalize time to business-day minutes (06:00=0, 23:00=1020, 00:00=1080, 05:59=1439)
+  const toBizMin = (h: number, m: number) => { let t = h * 60 + m - 360; if (t < 0) t += 1440; return t }
+
   // Check if therapist is currently serving a customer (only for today)
   const now = new Date()
   const todayBiz = getBusinessDate(now)
   const isPastDate = workDate < todayBiz
-  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const nowBiz = toBizMin(now.getHours(), now.getMinutes())
   const isServing = !isPastDate && therapist.slots.some(s => {
     if (!s.check_in_time || !s.check_out_time) return false
     const [inH, inM] = s.check_in_time.slice(0, 5).split(':').map(Number)
     const [outH, outM] = s.check_out_time.slice(0, 5).split(':').map(Number)
-    let inMin = inH * 60 + inM
-    let outMin = outH * 60 + outM
-    let adj = nowMin
-    if (outMin < inMin) {
-      outMin += 24 * 60
-      if (adj < inMin) adj += 24 * 60
-    }
-    return adj >= inMin && adj < outMin
+    const inBiz = toBizMin(inH, inM)
+    const outBiz = toBizMin(outH, outM)
+    return nowBiz >= inBiz && nowBiz < outBiz
   })
 
   // --- Column drag (whole column is draggable via header) ---

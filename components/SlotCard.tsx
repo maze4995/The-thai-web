@@ -29,6 +29,9 @@ export function SlotCard({ slot, workDate, onClick }: Props) {
 
   const hasCheckedIn = !!slot.check_in_time
 
+  // Normalize time to business-day minutes (06:00=0, 23:00=1020, 00:00=1080, 05:59=1439)
+  const toBizMin = (h: number, m: number) => { let t = h * 60 + m - 360; if (t < 0) t += 1440; return t }
+
   // Check if service is finished (check_out_time has passed)
   const [isFinished, setIsFinished] = useState(false)
   useEffect(() => {
@@ -38,17 +41,10 @@ export function SlotCard({ slot, workDate, onClick }: Props) {
       const todayBiz = getBusinessDate(now)
       // Past dates: always finished
       if (workDate < todayBiz) { setIsFinished(true); return }
-      const nowMin = now.getHours() * 60 + now.getMinutes()
-      const [inH, inM] = slot.check_in_time.slice(0, 5).split(':').map(Number)
+      const nowBiz = toBizMin(now.getHours(), now.getMinutes())
       const [outH, outM] = slot.check_out_time.slice(0, 5).split(':').map(Number)
-      let inMin = inH * 60 + inM
-      let outMin = outH * 60 + outM
-      let nowAdj = nowMin
-      if (outMin < inMin) {
-        outMin += 24 * 60
-        if (nowAdj < inMin) nowAdj += 24 * 60
-      }
-      setIsFinished(nowAdj >= inMin && nowAdj >= outMin)
+      const outBiz = toBizMin(outH, outM)
+      setIsFinished(nowBiz >= outBiz)
     }
     check()
     const interval = setInterval(check, 30000)
