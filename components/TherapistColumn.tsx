@@ -3,6 +3,7 @@
 import { DragEvent, useState } from 'react'
 import { TherapistWithSlots, ScheduleSlot } from '@/lib/types'
 import { SlotCard } from './SlotCard'
+import { getBusinessDate } from '@/lib/utils'
 
 const MAX_SLOTS = 7
 
@@ -10,21 +11,24 @@ type DropSide = 'left' | 'right' | null
 
 interface Props {
   therapist: TherapistWithSlots
+  workDate: string
   onAddSlot: () => void
   onEditSlot: (slot: ScheduleSlot) => void
   onDropSlot: (slotId: string, therapistId: string) => void
   onDropColumn: (draggedId: string, targetId: string, side: 'left' | 'right') => void
 }
 
-export function TherapistColumn({ therapist, onAddSlot, onEditSlot, onDropSlot, onDropColumn }: Props) {
+export function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, onDropSlot, onDropColumn }: Props) {
   const emptyCount = Math.max(0, MAX_SLOTS - therapist.slots.length)
   const [slotOver, setSlotOver] = useState(false)
   const [columnDropSide, setColumnDropSide] = useState<DropSide>(null)
 
-  // Check if therapist is currently serving a customer
+  // Check if therapist is currently serving a customer (only for today)
   const now = new Date()
+  const todayBiz = getBusinessDate(now)
+  const isPastDate = workDate < todayBiz
   const nowMin = now.getHours() * 60 + now.getMinutes()
-  const isServing = therapist.slots.some(s => {
+  const isServing = !isPastDate && therapist.slots.some(s => {
     if (!s.check_in_time || !s.check_out_time) return false
     const [inH, inM] = s.check_in_time.slice(0, 5).split(':').map(Number)
     const [outH, outM] = s.check_out_time.slice(0, 5).split(':').map(Number)
@@ -132,6 +136,7 @@ export function TherapistColumn({ therapist, onAddSlot, onEditSlot, onDropSlot, 
           <SlotCard
             key={slot.id}
             slot={slot}
+            workDate={workDate}
             onClick={() => onEditSlot(slot)}
           />
         ))}

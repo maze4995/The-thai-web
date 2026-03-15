@@ -3,10 +3,11 @@
 import { DragEvent, useState, useEffect } from 'react'
 import { ScheduleSlot } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
-import { formatTime, formatPrice, getPhoneLastFour, getServiceDuration, addMinutesToTime, PAYMENT_LABELS, PAYMENT_COLORS } from '@/lib/utils'
+import { formatTime, formatPrice, getPhoneLastFour, getServiceDuration, addMinutesToTime, getBusinessDate, PAYMENT_LABELS, PAYMENT_COLORS } from '@/lib/utils'
 
 interface Props {
   slot: ScheduleSlot
+  workDate: string
   onClick: () => void
 }
 
@@ -21,7 +22,7 @@ function roundUpTo10(date: Date): string {
   return `${String(h).padStart(2, '0')}:${String(rounded).padStart(2, '0')}`
 }
 
-export function SlotCard({ slot, onClick }: Props) {
+export function SlotCard({ slot, workDate, onClick }: Props) {
   const phone = getPhoneLastFour(slot.customer_phone)
   const paymentColor = PAYMENT_COLORS[slot.payment_type] ?? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600'
   const paymentLabel = PAYMENT_LABELS[slot.payment_type] ?? slot.payment_type
@@ -34,13 +35,15 @@ export function SlotCard({ slot, onClick }: Props) {
     const check = () => {
       if (!slot.check_in_time || !slot.check_out_time) { setIsFinished(false); return }
       const now = new Date()
+      const todayBiz = getBusinessDate(now)
+      // Past dates: always finished
+      if (workDate < todayBiz) { setIsFinished(true); return }
       const nowMin = now.getHours() * 60 + now.getMinutes()
       const [inH, inM] = slot.check_in_time.slice(0, 5).split(':').map(Number)
       const [outH, outM] = slot.check_out_time.slice(0, 5).split(':').map(Number)
       let inMin = inH * 60 + inM
       let outMin = outH * 60 + outM
       let nowAdj = nowMin
-      // Midnight crossover: if check_out < check_in, it crosses midnight
       if (outMin < inMin) {
         outMin += 24 * 60
         if (nowAdj < inMin) nowAdj += 24 * 60
@@ -48,9 +51,9 @@ export function SlotCard({ slot, onClick }: Props) {
       setIsFinished(nowAdj >= inMin && nowAdj >= outMin)
     }
     check()
-    const interval = setInterval(check, 30000) // check every 30s
+    const interval = setInterval(check, 30000)
     return () => clearInterval(interval)
-  }, [slot.check_in_time, slot.check_out_time])
+  }, [slot.check_in_time, slot.check_out_time, workDate])
 
   const handleDragStart = (e: DragEvent) => {
     e.dataTransfer.setData('application/slot-id', slot.id)

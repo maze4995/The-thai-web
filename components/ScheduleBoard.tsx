@@ -338,6 +338,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
               <TherapistColumn
                 key={therapist.id}
                 therapist={therapist}
+                workDate={date}
                 onAddSlot={() => handleAddSlot(therapist.id)}
                 onEditSlot={handleEditSlot}
                 onDropSlot={handleDropSlot}
