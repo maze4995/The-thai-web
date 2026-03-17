@@ -191,9 +191,15 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         slots: slots
           .filter(s => s.therapist_id === t.id)
           .sort((a, b) => {
-            if (!a.check_in_time) return 1
-            if (!b.check_in_time) return -1
-            return a.check_in_time.localeCompare(b.check_in_time)
+            // Sort by check_in_time, using business-day normalization (06:00=0, 00:00=1080)
+            const toBizMin = (t: string | null) => {
+              if (!t) return 9999 // no check-in → bottom
+              const [h, m] = t.slice(0, 5).split(':').map(Number)
+              let v = h * 60 + m - 360
+              if (v < 0) v += 1440
+              return v
+            }
+            return toBizMin(a.check_in_time) - toBizMin(b.check_in_time)
           }),
       }
     })
