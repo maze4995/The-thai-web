@@ -30,65 +30,65 @@ export function SummaryFooter({ slots, therapists }: Props) {
   })
 
   return (
-    <footer className="shrink-0 bg-white dark:bg-[#161b27] border-t border-slate-200 dark:border-slate-700/60 px-4 py-2.5">
+    <footer className="shrink-0 bg-white dark:bg-[#161b27] border-t border-slate-200 dark:border-slate-700/60 px-2.5 sm:px-4 py-1.5 sm:py-2.5">
       {/* Sales summary */}
-      <div className="flex items-center gap-4 mb-2 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <span className="text-slate-400 dark:text-slate-500 text-xs">총매출</span>
-          <span className="text-slate-900 dark:text-white font-bold text-sm">{formatPrice(total)}</span>
-        </div>
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
+      <div className="flex items-center gap-2 sm:gap-4 mb-1 sm:mb-2 flex-wrap text-[10px] sm:text-xs">
         <div className="flex items-center gap-1">
-          <span className="text-emerald-500 text-xs font-medium">현금</span>
-          <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold">{formatPrice(cash)}</span>
+          <span className="text-slate-400 dark:text-slate-500">총매출</span>
+          <span className="text-slate-900 dark:text-white font-bold text-xs sm:text-sm">{formatPrice(total)}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <span className="text-blue-400 text-xs font-medium">카드</span>
-          <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold">{formatPrice(card)}</span>
+        <div className="w-px h-3 sm:h-4 bg-slate-200 dark:bg-slate-700" />
+        <div className="flex items-center gap-0.5 sm:gap-1">
+          <span className="text-emerald-500 font-medium">현금</span>
+          <span className="text-slate-700 dark:text-slate-200 font-semibold">{formatPrice(cash)}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <span className="text-purple-400 text-xs font-medium">이체</span>
-          <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold">{formatPrice(transfer)}</span>
+        <div className="flex items-center gap-0.5 sm:gap-1">
+          <span className="text-blue-400 font-medium">카드</span>
+          <span className="text-slate-700 dark:text-slate-200 font-semibold">{formatPrice(card)}</span>
         </div>
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
-        <div className="flex items-center gap-1">
-          <span className="text-slate-400 dark:text-slate-500 text-xs">쿠폰</span>
-          <span className="text-amber-500 dark:text-amber-400 text-sm font-semibold">{couponCount}명</span>
+        <div className="flex items-center gap-0.5 sm:gap-1">
+          <span className="text-purple-400 font-medium">이체</span>
+          <span className="text-slate-700 dark:text-slate-200 font-semibold">{formatPrice(transfer)}</span>
         </div>
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
+        <div className="w-px h-3 sm:h-4 bg-slate-200 dark:bg-slate-700" />
+        <div className="flex items-center gap-0.5 sm:gap-1">
+          <span className="text-slate-400 dark:text-slate-500">쿠폰</span>
+          <span className="text-amber-500 dark:text-amber-400 font-semibold">{couponCount}명</span>
+        </div>
+        <div className="w-px h-3 sm:h-4 bg-slate-200 dark:bg-slate-700" />
         {newRoadCount > 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-rose-400 text-xs font-medium">신규로드</span>
-            <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold">{newRoadCount}명</span>
+          <div className="flex items-center gap-0.5 sm:gap-1">
+            <span className="text-rose-400 font-medium">신규로드</span>
+            <span className="text-slate-700 dark:text-slate-200 font-semibold">{newRoadCount}명</span>
           </div>
         )}
         {existingRoadCount > 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-orange-400 text-xs font-medium">기존로드</span>
-            <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold">{existingRoadCount}명</span>
+          <div className="flex items-center gap-0.5 sm:gap-1">
+            <span className="text-orange-400 font-medium">기존로드</span>
+            <span className="text-slate-700 dark:text-slate-200 font-semibold">{existingRoadCount}명</span>
           </div>
         )}
         {newCustomerCount > 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-cyan-400 text-xs font-medium">신규</span>
-            <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold">{newCustomerCount}명</span>
+          <div className="flex items-center gap-0.5 sm:gap-1">
+            <span className="text-cyan-400 font-medium">신규</span>
+            <span className="text-slate-700 dark:text-slate-200 font-semibold">{newCustomerCount}명</span>
           </div>
         )}
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
-        <div className="flex items-center gap-1">
-          <span className="text-slate-400 dark:text-slate-500 text-xs">총고객</span>
-          <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold">{totalCustomers}명</span>
+        <div className="w-px h-3 sm:h-4 bg-slate-200 dark:bg-slate-700" />
+        <div className="flex items-center gap-0.5 sm:gap-1">
+          <span className="text-slate-400 dark:text-slate-500">총고객</span>
+          <span className="text-slate-700 dark:text-slate-200 font-semibold">{totalCustomers}명</span>
         </div>
       </div>
 
       {/* Commission */}
       {commissions.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-slate-400 dark:text-slate-500 text-xs">커미션</span>
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <span className="text-slate-400 dark:text-slate-500 text-[10px] sm:text-xs">커미션</span>
           {commissions.map(c => (
-            <div key={c.name} className="flex items-center gap-1">
-              <span className="text-slate-500 dark:text-slate-400 text-xs">{c.name}</span>
-              <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold">{formatPrice(c.commission)}</span>
+            <div key={c.name} className="flex items-center gap-0.5 sm:gap-1">
+              <span className="text-slate-500 dark:text-slate-400 text-[10px] sm:text-xs">{c.name}</span>
+              <span className="text-emerald-600 dark:text-emerald-400 text-[10px] sm:text-xs font-semibold">{formatPrice(c.commission)}</span>
             </div>
           ))}
         </div>

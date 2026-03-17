@@ -83,59 +83,59 @@ export function SlotCard({ slot, workDate, onClick }: Props) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={onClick}
-      className="w-full text-left rounded-lg p-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing group border bg-slate-50 dark:bg-[#1e2535] hover:bg-slate-100 dark:hover:bg-[#252d40] border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-500"
+      className="w-full text-left rounded-lg p-1.5 sm:p-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing group border bg-slate-50 dark:bg-[#1e2535] hover:bg-slate-100 dark:hover:bg-[#252d40] border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-500"
     >
       {/* Row 1: Phone + Room + Finished badge */}
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-1.5">
-          <span className="text-slate-900 dark:text-slate-100 font-bold text-sm tracking-wider">{phone}</span>
+      <div className="flex items-center justify-between mb-1 sm:mb-1.5">
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          <span className="text-slate-900 dark:text-slate-100 font-bold text-xs sm:text-sm tracking-wider">{phone}</span>
           {isFinished && (
-            <span className="text-[10px] font-bold tracking-wider bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded">
-              관리완료
+            <span className="text-[9px] sm:text-[10px] font-bold tracking-wider bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 px-1 sm:px-1.5 py-0.5 rounded">
+              완료
             </span>
           )}
         </div>
-        <span className="text-xs font-semibold rounded px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+        <span className="text-[10px] sm:text-xs font-semibold rounded px-1 sm:px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
           {slot.room_number}번방
         </span>
       </div>
 
       {/* Row 2: Service + Price */}
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm">{slot.service_name}</span>
-        <span className={`text-xs font-medium px-1.5 py-0.5 rounded border ${paymentColor}`}>
+      <div className="flex items-center justify-between mb-1 sm:mb-1.5">
+        <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs sm:text-sm">{slot.service_name}</span>
+        <span className={`text-[10px] sm:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded border ${paymentColor}`}>
           {paymentLabel} {formatPrice(slot.service_price)}
         </span>
       </div>
 
       {/* Row 3: Time info (vertical) */}
-      <div className="flex flex-col gap-0.5 text-xs">
+      <div className="flex flex-col gap-0.5 text-[10px] sm:text-xs">
         {slot.reserved_time && (
           <div className="flex items-center justify-between">
-            <span className="text-amber-400 dark:text-amber-500 w-6">예약</span>
+            <span className="text-amber-400 dark:text-amber-500 w-5 sm:w-6">예약</span>
             <span className="text-amber-500 dark:text-amber-400 font-medium">{formatTime(slot.reserved_time)}</span>
           </div>
         )}
         <div className="flex items-center justify-between">
-          <span className="text-slate-400 dark:text-slate-500 w-6">입</span>
+          <span className="text-slate-400 dark:text-slate-500 w-5 sm:w-6">입</span>
           <span className="text-slate-600 dark:text-slate-300 font-medium">{formatTime(slot.check_in_time)}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-slate-400 dark:text-slate-500 w-6">출</span>
+          <span className="text-slate-400 dark:text-slate-500 w-5 sm:w-6">출</span>
           <span className="text-slate-600 dark:text-slate-300 font-medium">{formatTime(slot.check_out_time)}</span>
         </div>
       </div>
 
       {/* Row 4: Memo */}
-      <div className="mt-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-700/40">
-        <span className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{slot.memo || '\u00A0'}</span>
+      <div className="mt-1 sm:mt-1.5 pt-1 sm:pt-1.5 border-t border-slate-200 dark:border-slate-700/40">
+        <span className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 line-clamp-1 sm:line-clamp-2">{slot.memo || '\u00A0'}</span>
       </div>
 
       {/* Arrival button - shown only when no check-in time */}
       {!hasCheckedIn && (
         <button
           onClick={handleArrival}
-          className="w-full mt-2 py-1.5 bg-amber-500 hover:bg-amber-400 dark:bg-amber-600 dark:hover:bg-amber-500 text-white text-xs font-bold rounded-md transition-colors"
+          className="w-full mt-1.5 sm:mt-2 py-1 sm:py-1.5 bg-amber-500 hover:bg-amber-400 dark:bg-amber-600 dark:hover:bg-amber-500 text-white text-[10px] sm:text-xs font-bold rounded-md transition-colors"
         >
           손님도착
         </button>

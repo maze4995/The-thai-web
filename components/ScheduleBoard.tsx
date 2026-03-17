@@ -268,71 +268,75 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-[#0f1117] text-slate-800 dark:text-slate-200">
       {/* Header */}
-      <header className="flex items-center justify-between px-5 py-3 bg-white dark:bg-[#161b27] border-b border-slate-200 dark:border-slate-700/60 shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">The Thai Web</h1>
-          <span className="text-slate-400 dark:text-slate-500 text-xs">조판지</span>
+      <header className="shrink-0 bg-white dark:bg-[#161b27] border-b border-slate-200 dark:border-slate-700/60">
+        {/* Top row: title + actions */}
+        <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <h1 className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">The Thai</h1>
+            <span className="text-slate-400 dark:text-slate-500 text-[10px] sm:text-xs hidden sm:inline">조판지</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              onClick={toggle}
+              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
+              title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+            <a
+              href="/therapists"
+              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 transition-colors"
+            >
+              관리사
+            </a>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Date navigation row */}
+        <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 pb-2 sm:pb-3">
           <button
             onClick={() => navigateDate(-1)}
-            className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-sm transition-colors"
+            className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
           >
             ←
           </button>
           <button
             onClick={goToToday}
-            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+            className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
               isToday ? 'bg-emerald-800/60 text-emerald-300 border border-emerald-700' : 'bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
             }`}
           >
             오늘
           </button>
-          <span className="px-4 py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-sm font-semibold min-w-[200px] text-center text-slate-900 dark:text-slate-100">
+          <span className="px-3 sm:px-4 py-1 sm:py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-xs sm:text-sm font-semibold min-w-[140px] sm:min-w-[200px] text-center text-slate-900 dark:text-slate-100">
             {formatDate(dateObj)}
           </span>
           <button
             onClick={() => navigateDate(1)}
-            className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-sm transition-colors"
+            className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
           >
             →
           </button>
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggle}
-            className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-sm transition-colors"
-            title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
-          <a
-            href="/therapists"
-            className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs text-slate-600 dark:text-slate-300 transition-colors"
-          >
-            관리사 관리
-          </a>
-        </div>
       </header>
 
       {/* Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-auto p-3 min-h-0">
+      <div className="flex-1 overflow-x-auto overflow-y-auto p-2 sm:p-3 min-h-0">
         {presentTherapists.length === 0 ? (
           <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500">
             <div className="text-center">
-              <div className="text-5xl mb-4">📋</div>
-              <div className="text-lg font-medium mb-2">출근한 관리사가 없습니다</div>
-              <a href="/therapists" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 text-sm underline underline-offset-2">
+              <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">📋</div>
+              <div className="text-sm sm:text-lg font-medium mb-2">출근한 관리사가 없습니다</div>
+              <a href="/therapists" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 text-xs sm:text-sm underline underline-offset-2">
                 관리사 출근 처리하기 →
               </a>
             </div>
           </div>
         ) : (
           <div
-            className="grid gap-3 h-full"
-            style={{ gridTemplateColumns: `repeat(${presentTherapists.length}, minmax(210px, 1fr))` }}
+            className="grid gap-2 sm:gap-3 h-full"
+            style={{ gridTemplateColumns: `repeat(${presentTherapists.length}, minmax(160px, 1fr))` }}
           >
             {presentTherapists.map(therapist => (
               <TherapistColumn
