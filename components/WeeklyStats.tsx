@@ -1,0 +1,287 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '@/lib/supabase'
+import { ScheduleSlot, Therapist } from '@/lib/types'
+import { formatPrice, toDateString, getServiceCommission } from '@/lib/utils'
+import { useTheme } from './ThemeProvider'
+
+interface Props {
+  initialTherapists: Therapist[]
+  initialWeekStart: string
+}
+
+/** Get Monday of the week containing the given date */
+function getMonday(dateStr: string): Date {
+  const d = new Date(dateStr + 'T00:00:00')
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day // Monday=1, Sunday shift back 6
+  d.setDate(d.getDate() + diff)
+  return d
+}
+
+/** Get array of 7 date strings Mon~Sun */
+function getWeekDates(mondayStr: string): string[] {
+  const dates: string[] = []
+  const d = new Date(mondayStr + 'T00:00:00')
+  for (let i = 0; i < 7; i++) {
+    dates.push(toDateString(d))
+    d.setDate(d.getDate() + 1)
+  }
+  return dates
+}
+
+const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일']
+
+export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
+  const [weekStart, setWeekStart] = useState(initialWeekStart)
+  const [slots, setSlots] = useState<ScheduleSlot[]>([])
+  const [therapists] = useState(initialTherapists)
+  const [loading, setLoading] = useState(true)
+  const { theme, toggle } = useTheme()
+
+  const weekDates = getWeekDates(weekStart)
+  const weekEnd = weekDates[6]
+
+  const fetchWeekData = useCallback(async (start: string, end: string) => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('schedule_slots')
+      .select('*')
+      .gte('work_date', start)
+      .lte('work_date', end)
+    setSlots(data ?? [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchWeekData(weekDates[0], weekDates[6])
+  }, [weekStart, fetchWeekData])
+
+  const navigateWeek = (delta: number) => {
+    const d = new Date(weekStart + 'T00:00:00')
+    d.setDate(d.getDate() + delta * 7)
+    setWeekStart(toDateString(d))
+  }
+
+  const goThisWeek = () => {
+    const monday = getMonday(toDateString(new Date()))
+    setWeekStart(toDateString(monday))
+  }
+
+  // --- Calculations ---
+  // Coupon slots: memo contains 'CM'
+  const isCoupon = (s: ScheduleSlot) => s.memo?.includes('CM')
+
+  // Total revenue (excluding coupon with price 0)
+  const totalRevenue = slots.filter(s => !isCoupon(s)).reduce((sum, s) => sum + s.service_price, 0)
+  const cashTotal = slots.filter(s => s.payment_type === 'cash' && !isCoupon(s)).reduce((sum, s) => sum + s.service_price, 0)
+  const cardTotal = slots.filter(s => s.payment_type === 'card' && !isCoupon(s)).reduce((sum, s) => sum + s.service_price, 0)
+  const transferTotal = slots.filter(s => s.payment_type === 'transfer' && !isCoupon(s)).reduce((sum, s) => sum + s.service_price, 0)
+  const couponCount = slots.filter(s => isCoupon(s)).length
+  const totalCustomers = slots.length
+
+  // Daily breakdown
+  const dailyData = weekDates.map((date, i) => {
+    const daySlots = slots.filter(s => s.work_date === date)
+    const nonCoupon = daySlots.filter(s => !isCoupon(s))
+    return {
+      date,
+      label: DAY_LABELS[i],
+      total: nonCoupon.reduce((sum, s) => sum + s.service_price, 0),
+      cash: nonCoupon.filter(s => s.payment_type === 'cash').reduce((sum, s) => sum + s.service_price, 0),
+      card: nonCoupon.filter(s => s.payment_type === 'card').reduce((sum, s) => sum + s.service_price, 0),
+      transfer: nonCoupon.filter(s => s.payment_type === 'transfer').reduce((sum, s) => sum + s.service_price, 0),
+      coupon: daySlots.filter(s => isCoupon(s)).length,
+      customers: daySlots.length,
+    }
+  })
+
+  // Commission per therapist
+  const commissions = therapists
+    .map(t => {
+      const tSlots = slots.filter(s => s.therapist_id === t.id)
+      const commission = tSlots.reduce((sum, s) => sum + getServiceCommission(s.service_name), 0)
+      return { name: t.name, commission, count: tSlots.length }
+    })
+    .filter(c => c.count > 0)
+    .sort((a, b) => b.commission - a.commission)
+
+  // Format date display
+  const formatShort = (dateStr: string) => {
+    const d = new Date(dateStr + 'T00:00:00')
+    return `${d.getMonth() + 1}/${d.getDate()}`
+  }
+
+  const isThisWeek = weekStart === toDateString(getMonday(toDateString(new Date())))
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-100 dark:bg-[#0f1117] text-slate-800 dark:text-slate-200">
+      {/* Header */}
+      <header className="shrink-0 bg-white dark:bg-[#161b27] border-b border-slate-200 dark:border-slate-700/60">
+        <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <h1 className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">주별 매출 통계</h1>
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              onClick={toggle}
+              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+            <a
+              href="/"
+              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 transition-colors"
+            >
+              조판지
+            </a>
+          </div>
+        </div>
+
+        {/* Week navigation */}
+        <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 pb-2 sm:pb-3">
+          <button
+            onClick={() => navigateWeek(-1)}
+            className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
+          >
+            ←
+          </button>
+          <button
+            onClick={goThisWeek}
+            className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
+              isThisWeek ? 'bg-emerald-800/60 text-emerald-300 border border-emerald-700' : 'bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            이번주
+          </button>
+          <span className="px-3 sm:px-4 py-1 sm:py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-xs sm:text-sm font-semibold text-center text-slate-900 dark:text-slate-100">
+            {formatShort(weekDates[0])} ~ {formatShort(weekDates[6])}
+          </span>
+          <button
+            onClick={() => navigateWeek(1)}
+            className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
+          >
+            →
+          </button>
+        </div>
+      </header>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4 sm:space-y-6">
+        {loading ? (
+          <div className="flex items-center justify-center h-40 text-slate-400">
+            로딩중...
+          </div>
+        ) : (
+          <>
+            {/* Weekly Summary Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              <div className="bg-white dark:bg-[#161b27] rounded-xl p-3 sm:p-4 border border-slate-200 dark:border-slate-700/40">
+                <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mb-1">총매출</div>
+                <div className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{formatPrice(totalRevenue)}</div>
+                <div className="text-[10px] sm:text-xs text-slate-400 mt-1">총 {totalCustomers}명</div>
+              </div>
+              <div className="bg-white dark:bg-[#161b27] rounded-xl p-3 sm:p-4 border border-slate-200 dark:border-slate-700/40">
+                <div className="text-[10px] sm:text-xs text-emerald-500 mb-1">현금</div>
+                <div className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{formatPrice(cashTotal)}</div>
+              </div>
+              <div className="bg-white dark:bg-[#161b27] rounded-xl p-3 sm:p-4 border border-slate-200 dark:border-slate-700/40">
+                <div className="text-[10px] sm:text-xs text-blue-400 mb-1">카드</div>
+                <div className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{formatPrice(cardTotal)}</div>
+              </div>
+              <div className="bg-white dark:bg-[#161b27] rounded-xl p-3 sm:p-4 border border-slate-200 dark:border-slate-700/40">
+                <div className="text-[10px] sm:text-xs text-purple-400 mb-1">이체</div>
+                <div className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{formatPrice(transferTotal)}</div>
+                <div className="text-[10px] sm:text-xs text-amber-400 mt-1">쿠폰 {couponCount}건</div>
+              </div>
+            </div>
+
+            {/* Daily Breakdown Table */}
+            <div className="bg-white dark:bg-[#161b27] rounded-xl border border-slate-200 dark:border-slate-700/40 overflow-hidden">
+              <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-200 dark:border-slate-700/40">
+                <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">일별 매출</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[10px] sm:text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-[#1a2035]">
+                      <th className="px-2 sm:px-3 py-2 text-left text-slate-500 dark:text-slate-400 font-medium">날짜</th>
+                      <th className="px-2 sm:px-3 py-2 text-right text-slate-500 dark:text-slate-400 font-medium">총매출</th>
+                      <th className="px-2 sm:px-3 py-2 text-right text-emerald-500 font-medium">현금</th>
+                      <th className="px-2 sm:px-3 py-2 text-right text-blue-400 font-medium">카드</th>
+                      <th className="px-2 sm:px-3 py-2 text-right text-purple-400 font-medium">이체</th>
+                      <th className="px-2 sm:px-3 py-2 text-right text-amber-400 font-medium">쿠폰</th>
+                      <th className="px-2 sm:px-3 py-2 text-right text-slate-500 dark:text-slate-400 font-medium">고객</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dailyData.map((day, i) => (
+                      <tr key={day.date} className={`border-t border-slate-100 dark:border-slate-800 ${i % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-slate-800/20'}`}>
+                        <td className="px-2 sm:px-3 py-2 font-medium text-slate-700 dark:text-slate-300">
+                          <span className="text-slate-400 dark:text-slate-500 mr-1">{day.label}</span>
+                          {formatShort(day.date)}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 text-right font-bold text-slate-900 dark:text-white">{formatPrice(day.total)}</td>
+                        <td className="px-2 sm:px-3 py-2 text-right text-slate-700 dark:text-slate-300">{formatPrice(day.cash)}</td>
+                        <td className="px-2 sm:px-3 py-2 text-right text-slate-700 dark:text-slate-300">{formatPrice(day.card)}</td>
+                        <td className="px-2 sm:px-3 py-2 text-right text-slate-700 dark:text-slate-300">{formatPrice(day.transfer)}</td>
+                        <td className="px-2 sm:px-3 py-2 text-right text-amber-500">{day.coupon > 0 ? `${day.coupon}건` : '-'}</td>
+                        <td className="px-2 sm:px-3 py-2 text-right text-slate-700 dark:text-slate-300">{day.customers}명</td>
+                      </tr>
+                    ))}
+                    {/* Total row */}
+                    <tr className="border-t-2 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-[#1a2035] font-bold">
+                      <td className="px-2 sm:px-3 py-2 text-slate-900 dark:text-white">합계</td>
+                      <td className="px-2 sm:px-3 py-2 text-right text-slate-900 dark:text-white">{formatPrice(totalRevenue)}</td>
+                      <td className="px-2 sm:px-3 py-2 text-right text-emerald-600 dark:text-emerald-400">{formatPrice(cashTotal)}</td>
+                      <td className="px-2 sm:px-3 py-2 text-right text-blue-500 dark:text-blue-400">{formatPrice(cardTotal)}</td>
+                      <td className="px-2 sm:px-3 py-2 text-right text-purple-500 dark:text-purple-400">{formatPrice(transferTotal)}</td>
+                      <td className="px-2 sm:px-3 py-2 text-right text-amber-500">{couponCount > 0 ? `${couponCount}건` : '-'}</td>
+                      <td className="px-2 sm:px-3 py-2 text-right text-slate-900 dark:text-white">{totalCustomers}명</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Commission Table */}
+            {commissions.length > 0 && (
+              <div className="bg-white dark:bg-[#161b27] rounded-xl border border-slate-200 dark:border-slate-700/40 overflow-hidden">
+                <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-200 dark:border-slate-700/40">
+                  <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">관리사별 커미션</h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[10px] sm:text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-[#1a2035]">
+                        <th className="px-2 sm:px-3 py-2 text-left text-slate-500 dark:text-slate-400 font-medium">관리사</th>
+                        <th className="px-2 sm:px-3 py-2 text-right text-slate-500 dark:text-slate-400 font-medium">건수</th>
+                        <th className="px-2 sm:px-3 py-2 text-right text-emerald-500 font-medium">커미션</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {commissions.map((c, i) => (
+                        <tr key={c.name} className={`border-t border-slate-100 dark:border-slate-800 ${i % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-slate-800/20'}`}>
+                          <td className="px-2 sm:px-3 py-2 font-medium text-slate-700 dark:text-slate-300">{c.name}</td>
+                          <td className="px-2 sm:px-3 py-2 text-right text-slate-700 dark:text-slate-300">{c.count}건</td>
+                          <td className="px-2 sm:px-3 py-2 text-right font-bold text-emerald-600 dark:text-emerald-400">{formatPrice(c.commission)}</td>
+                        </tr>
+                      ))}
+                      {/* Total row */}
+                      <tr className="border-t-2 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-[#1a2035] font-bold">
+                        <td className="px-2 sm:px-3 py-2 text-slate-900 dark:text-white">합계</td>
+                        <td className="px-2 sm:px-3 py-2 text-right text-slate-900 dark:text-white">{commissions.reduce((s, c) => s + c.count, 0)}건</td>
+                        <td className="px-2 sm:px-3 py-2 text-right text-emerald-600 dark:text-emerald-400">{formatPrice(commissions.reduce((s, c) => s + c.commission, 0))}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
