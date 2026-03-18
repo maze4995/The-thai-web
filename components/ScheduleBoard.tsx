@@ -117,7 +117,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         .sort((a, b) => {
           const countDiff = (slotCounts.get(a.id) ?? 0) - (slotCounts.get(b.id) ?? 0)
           if (countDiff !== 0) return countDiff
-          return a.display_order - b.display_order
+          return (attendanceOrder.get(a.id) ?? 0) - (attendanceOrder.get(b.id) ?? 0)
         })
 
       const assignTo = sorted[0]
@@ -273,16 +273,38 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-[#0f1117] text-slate-800 dark:text-slate-200">
-      {/* Header */}
+      {/* Header - single row */}
       <header className="shrink-0 bg-white dark:bg-[#161b27] border-b border-slate-200 dark:border-slate-700/60">
-        {/* Top row: title + actions */}
         <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <h1 className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">The Thai</h1>
-            <span className="text-slate-400 dark:text-slate-500 text-[10px] sm:text-xs hidden sm:inline">조판지</span>
-          </div>
+          <h1 className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-tight shrink-0">The Thai</h1>
 
           <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              onClick={() => navigateDate(-1)}
+              className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
+            >
+              ←
+            </button>
+            <button
+              onClick={goToToday}
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
+                isToday ? 'bg-emerald-800/60 text-emerald-300 border border-emerald-700' : 'bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              오늘
+            </button>
+            <span className="px-3 sm:px-4 py-1 sm:py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-xs sm:text-sm font-semibold min-w-[140px] sm:min-w-[200px] text-center text-slate-900 dark:text-slate-100">
+              {formatDate(dateObj)}
+            </span>
+            <button
+              onClick={() => navigateDate(1)}
+              className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
+            >
+              →
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={toggle}
               className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
@@ -303,33 +325,6 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
               관리사
             </a>
           </div>
-        </div>
-
-        {/* Date navigation row */}
-        <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 pb-2 sm:pb-3">
-          <button
-            onClick={() => navigateDate(-1)}
-            className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
-          >
-            ←
-          </button>
-          <button
-            onClick={goToToday}
-            className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
-              isToday ? 'bg-emerald-800/60 text-emerald-300 border border-emerald-700' : 'bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            오늘
-          </button>
-          <span className="px-3 sm:px-4 py-1 sm:py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-xs sm:text-sm font-semibold min-w-[140px] sm:min-w-[200px] text-center text-slate-900 dark:text-slate-100">
-            {formatDate(dateObj)}
-          </span>
-          <button
-            onClick={() => navigateDate(1)}
-            className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
-          >
-            →
-          </button>
         </div>
       </header>
 

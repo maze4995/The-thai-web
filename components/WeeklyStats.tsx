@@ -117,13 +117,38 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-[#0f1117] text-slate-800 dark:text-slate-200">
-      {/* Header */}
+      {/* Header - single row */}
       <header className="shrink-0 bg-white dark:bg-[#161b27] border-b border-slate-200 dark:border-slate-700/60">
         <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <h1 className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">주별 매출 통계</h1>
-          </div>
+          <h1 className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-tight shrink-0">통계</h1>
+
           <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              onClick={() => navigateWeek(-1)}
+              className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
+            >
+              ←
+            </button>
+            <button
+              onClick={goThisWeek}
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
+                isThisWeek ? 'bg-emerald-800/60 text-emerald-300 border border-emerald-700' : 'bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              이번주
+            </button>
+            <span className="px-3 sm:px-4 py-1 sm:py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-xs sm:text-sm font-semibold text-center text-slate-900 dark:text-slate-100">
+              {formatShort(weekDates[0])} ~ {formatShort(weekDates[6])}
+            </span>
+            <button
+              onClick={() => navigateWeek(1)}
+              className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
+            >
+              →
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={toggle}
               className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
@@ -137,33 +162,6 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
               조판지
             </a>
           </div>
-        </div>
-
-        {/* Week navigation */}
-        <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 pb-2 sm:pb-3">
-          <button
-            onClick={() => navigateWeek(-1)}
-            className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
-          >
-            ←
-          </button>
-          <button
-            onClick={goThisWeek}
-            className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
-              isThisWeek ? 'bg-emerald-800/60 text-emerald-300 border border-emerald-700' : 'bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            이번주
-          </button>
-          <span className="px-3 sm:px-4 py-1 sm:py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-xs sm:text-sm font-semibold text-center text-slate-900 dark:text-slate-100">
-            {formatShort(weekDates[0])} ~ {formatShort(weekDates[6])}
-          </span>
-          <button
-            onClick={() => navigateWeek(1)}
-            className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
-          >
-            →
-          </button>
         </div>
       </header>
 
