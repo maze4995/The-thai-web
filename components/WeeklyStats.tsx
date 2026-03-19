@@ -70,15 +70,24 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   }
 
   // --- Calculations ---
-  // Coupon slots: memo contains 'CM'
+  // Coupon slots: memo contains 'CM' (free coupon use, excluded from revenue)
   const isCoupon = (s: ScheduleSlot) => s.memo?.includes('CM')
+  // Special: memo contains '스페셜' (coupon purchase customer, INCLUDED in revenue)
+  const isSpecial = (s: ScheduleSlot) => s.memo?.includes('스페셜')
+  // 문자할인: memo contains '문자할인'
+  const isSmsDiscount = (s: ScheduleSlot) => s.memo?.includes('문자할인')
 
-  // Total revenue (excluding coupon with price 0)
-  const totalRevenue = slots.filter(s => !isCoupon(s)).reduce((sum, s) => sum + s.service_price, 0)
-  const cashTotal = slots.filter(s => s.payment_type === 'cash' && !isCoupon(s)).reduce((sum, s) => sum + s.service_price, 0)
-  const cardTotal = slots.filter(s => s.payment_type === 'card' && !isCoupon(s)).reduce((sum, s) => sum + s.service_price, 0)
-  const transferTotal = slots.filter(s => s.payment_type === 'transfer' && !isCoupon(s)).reduce((sum, s) => sum + s.service_price, 0)
+  // Total revenue: exclude CM coupon, but INCLUDE 스페셜
+  const revenueSlots = slots.filter(s => !isCoupon(s))
+  const totalRevenue = revenueSlots.reduce((sum, s) => sum + s.service_price, 0)
+  const cashTotal = revenueSlots.filter(s => s.payment_type === 'cash').reduce((sum, s) => sum + s.service_price, 0)
+  const cardTotal = revenueSlots.filter(s => s.payment_type === 'card').reduce((sum, s) => sum + s.service_price, 0)
+  const transferTotal = revenueSlots.filter(s => s.payment_type === 'transfer').reduce((sum, s) => sum + s.service_price, 0)
   const couponCount = slots.filter(s => isCoupon(s)).length
+  const specialSlots = slots.filter(s => isSpecial(s))
+  const specialCount = specialSlots.length
+  const specialRevenue = specialSlots.reduce((sum, s) => sum + s.service_price, 0)
+  const smsDiscountSlots = slots.filter(s => isSmsDiscount(s))
   const totalCustomers = slots.length
 
   // Daily breakdown
@@ -93,6 +102,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
       card: nonCoupon.filter(s => s.payment_type === 'card').reduce((sum, s) => sum + s.service_price, 0),
       transfer: nonCoupon.filter(s => s.payment_type === 'transfer').reduce((sum, s) => sum + s.service_price, 0),
       coupon: daySlots.filter(s => isCoupon(s)).length,
+      special: daySlots.filter(s => isSpecial(s)).length,
       customers: daySlots.length,
     }
   })
@@ -174,7 +184,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
         ) : (
           <>
             {/* Weekly Summary Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
               <div className="bg-white dark:bg-[#161b27] rounded-xl p-3 sm:p-4 border border-slate-200 dark:border-slate-700/40">
                 <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mb-1">총매출</div>
                 <div className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{formatPrice(totalRevenue)}</div>
@@ -191,7 +201,15 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
               <div className="bg-white dark:bg-[#161b27] rounded-xl p-3 sm:p-4 border border-slate-200 dark:border-slate-700/40">
                 <div className="text-[10px] sm:text-xs text-purple-400 mb-1">이체</div>
                 <div className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{formatPrice(transferTotal)}</div>
-                <div className="text-[10px] sm:text-xs text-amber-400 mt-1">쿠폰 {couponCount}건</div>
+              </div>
+              <div className="bg-white dark:bg-[#161b27] rounded-xl p-3 sm:p-4 border border-slate-200 dark:border-slate-700/40">
+                <div className="text-[10px] sm:text-xs text-amber-400 mb-1">쿠폰</div>
+                <div className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{couponCount}건</div>
+              </div>
+              <div className="bg-white dark:bg-[#161b27] rounded-xl p-3 sm:p-4 border border-slate-200 dark:border-slate-700/40">
+                <div className="text-[10px] sm:text-xs text-pink-400 mb-1">쿠폰구매(스페셜)</div>
+                <div className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{specialCount}건</div>
+                <div className="text-[10px] sm:text-xs text-pink-400 mt-1">{formatPrice(specialRevenue)}</div>
               </div>
             </div>
 
@@ -210,6 +228,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
                       <th className="px-2 sm:px-3 py-2 text-right text-blue-400 font-medium">카드</th>
                       <th className="px-2 sm:px-3 py-2 text-right text-purple-400 font-medium">이체</th>
                       <th className="px-2 sm:px-3 py-2 text-right text-amber-400 font-medium">쿠폰</th>
+                      <th className="px-2 sm:px-3 py-2 text-right text-pink-400 font-medium">스페셜</th>
                       <th className="px-2 sm:px-3 py-2 text-right text-slate-500 dark:text-slate-400 font-medium">고객</th>
                     </tr>
                   </thead>
@@ -225,6 +244,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
                         <td className="px-2 sm:px-3 py-2 text-right text-slate-700 dark:text-slate-300">{formatPrice(day.card)}</td>
                         <td className="px-2 sm:px-3 py-2 text-right text-slate-700 dark:text-slate-300">{formatPrice(day.transfer)}</td>
                         <td className="px-2 sm:px-3 py-2 text-right text-amber-500">{day.coupon > 0 ? `${day.coupon}건` : '-'}</td>
+                        <td className="px-2 sm:px-3 py-2 text-right text-pink-500">{day.special > 0 ? `${day.special}건` : '-'}</td>
                         <td className="px-2 sm:px-3 py-2 text-right text-slate-700 dark:text-slate-300">{day.customers}명</td>
                       </tr>
                     ))}
@@ -236,6 +256,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
                       <td className="px-2 sm:px-3 py-2 text-right text-blue-500 dark:text-blue-400">{formatPrice(cardTotal)}</td>
                       <td className="px-2 sm:px-3 py-2 text-right text-purple-500 dark:text-purple-400">{formatPrice(transferTotal)}</td>
                       <td className="px-2 sm:px-3 py-2 text-right text-amber-500">{couponCount > 0 ? `${couponCount}건` : '-'}</td>
+                      <td className="px-2 sm:px-3 py-2 text-right text-pink-500">{specialCount > 0 ? `${specialCount}건` : '-'}</td>
                       <td className="px-2 sm:px-3 py-2 text-right text-slate-900 dark:text-white">{totalCustomers}명</td>
                     </tr>
                   </tbody>
@@ -272,6 +293,43 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
                         <td className="px-2 sm:px-3 py-2 text-right text-slate-900 dark:text-white">{commissions.reduce((s, c) => s + c.count, 0)}건</td>
                         <td className="px-2 sm:px-3 py-2 text-right text-emerald-600 dark:text-emerald-400">{formatPrice(commissions.reduce((s, c) => s + c.commission, 0))}</td>
                       </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* SMS Discount Customers */}
+            {smsDiscountSlots.length > 0 && (
+              <div className="bg-white dark:bg-[#161b27] rounded-xl border border-slate-200 dark:border-slate-700/40 overflow-hidden">
+                <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-200 dark:border-slate-700/40">
+                  <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                    문자할인 고객 <span className="text-slate-400 font-normal">{smsDiscountSlots.length}건</span>
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[10px] sm:text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-[#1a2035]">
+                        <th className="px-2 sm:px-3 py-2 text-left text-slate-500 dark:text-slate-400 font-medium">날짜</th>
+                        <th className="px-2 sm:px-3 py-2 text-left text-slate-500 dark:text-slate-400 font-medium">고객명</th>
+                        <th className="px-2 sm:px-3 py-2 text-left text-slate-500 dark:text-slate-400 font-medium">연락처</th>
+                        <th className="px-2 sm:px-3 py-2 text-left text-slate-500 dark:text-slate-400 font-medium">서비스</th>
+                        <th className="px-2 sm:px-3 py-2 text-right text-slate-500 dark:text-slate-400 font-medium">금액</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {smsDiscountSlots
+                        .sort((a, b) => a.work_date.localeCompare(b.work_date))
+                        .map((s, i) => (
+                        <tr key={s.id} className={`border-t border-slate-100 dark:border-slate-800 ${i % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-slate-800/20'}`}>
+                          <td className="px-2 sm:px-3 py-2 text-slate-700 dark:text-slate-300">{formatShort(s.work_date)}</td>
+                          <td className="px-2 sm:px-3 py-2 font-medium text-slate-700 dark:text-slate-300">{s.customer_name}</td>
+                          <td className="px-2 sm:px-3 py-2 text-slate-700 dark:text-slate-300">{s.customer_phone || '-'}</td>
+                          <td className="px-2 sm:px-3 py-2 text-emerald-600 dark:text-emerald-400">{s.service_name}</td>
+                          <td className="px-2 sm:px-3 py-2 text-right font-semibold text-slate-700 dark:text-slate-300">{formatPrice(s.service_price)}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
