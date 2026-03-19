@@ -153,9 +153,16 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
             >
               이번주
             </button>
-            <span className="px-3 sm:px-4 py-1 sm:py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-xs sm:text-sm font-semibold text-center text-slate-900 dark:text-slate-100">
-              {formatShort(weekDates[0])} ~ {formatShort(weekDates[6])}
-            </span>
+            <input
+              type="date"
+              value={weekStart}
+              onChange={e => {
+                if (!e.target.value) return
+                const monday = getMonday(e.target.value)
+                setWeekStart(toDateString(monday))
+              }}
+              className="px-3 sm:px-4 py-1 sm:py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-xs sm:text-sm font-semibold text-center text-slate-900 dark:text-slate-100 border-none outline-none cursor-pointer [color-scheme:dark]"
+            />
             <button
               onClick={() => navigateWeek(1)}
               className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"

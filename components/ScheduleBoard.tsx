@@ -293,9 +293,12 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
             >
               오늘
             </button>
-            <span className="px-3 sm:px-4 py-1 sm:py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-xs sm:text-sm font-semibold min-w-[140px] sm:min-w-[200px] text-center text-slate-900 dark:text-slate-100">
-              {formatDate(dateObj)}
-            </span>
+            <input
+              type="date"
+              value={date}
+              onChange={e => e.target.value && setDate(e.target.value)}
+              className="px-3 sm:px-4 py-1 sm:py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-xs sm:text-sm font-semibold min-w-[140px] sm:min-w-[200px] text-center text-slate-900 dark:text-slate-100 border-none outline-none cursor-pointer [color-scheme:dark]"
+            />
             <button
               onClick={() => navigateDate(1)}
               className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
