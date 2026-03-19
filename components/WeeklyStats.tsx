@@ -88,10 +88,12 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   const specialCount = specialSlots.length
   const specialRevenue = specialSlots.reduce((sum, s) => sum + s.service_price, 0)
   const smsDiscountSlots = slots.filter(s => isSmsDiscount(s))
-  // 신규 고객 (고객명에 'New' 포함, 로드 제외 = 순수 신규)
-  const newCustomerSlots = slots.filter(s => getCustomerType(s.customer_name) === '신규')
-  const newRoadSlots = slots.filter(s => getCustomerType(s.customer_name) === '신규로드')
-  const existingRoadSlots = slots.filter(s => getCustomerType(s.customer_name) === '기존로드')
+  // 신규 고객: 순수 신규 + 신규로드(연락처 010-XXXX-XXXX 형식만)
+  const phonePattern = /^010-\d{4}-\d{4}$/
+  const newAllSlots = [
+    ...slots.filter(s => getCustomerType(s.customer_name) === '신규'),
+    ...slots.filter(s => getCustomerType(s.customer_name) === '신규로드' && phonePattern.test(s.customer_phone ?? '')),
+  ]
   const totalCustomers = slots.length
 
   // Daily breakdown
@@ -305,9 +307,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
 
             {/* Customer Detail Tables */}
             {[
-              { title: '신규 고객', data: newCustomerSlots, color: 'text-cyan-400' },
-              { title: '신규로드 고객', data: newRoadSlots, color: 'text-rose-400' },
-              { title: '기존로드 고객', data: existingRoadSlots, color: 'text-orange-400' },
+              { title: '신규 고객', data: newAllSlots, color: 'text-cyan-400' },
               { title: '문자할인 고객', data: smsDiscountSlots, color: 'text-indigo-400' },
             ].filter(section => section.data.length > 0).map(section => (
               <div key={section.title} className="bg-white dark:bg-[#161b27] rounded-xl border border-slate-200 dark:border-slate-700/40 overflow-hidden">
