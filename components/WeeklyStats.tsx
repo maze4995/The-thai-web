@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Therapist } from '@/lib/types'
-import { formatPrice, toDateString, getServiceCommission } from '@/lib/utils'
+import { formatPrice, toDateString, getServiceCommission, getCustomerType } from '@/lib/utils'
 import { useTheme } from './ThemeProvider'
 
 interface Props {
@@ -88,6 +88,10 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   const specialCount = specialSlots.length
   const specialRevenue = specialSlots.reduce((sum, s) => sum + s.service_price, 0)
   const smsDiscountSlots = slots.filter(s => isSmsDiscount(s))
+  // 신규 고객 (고객명에 'New' 포함, 로드 제외 = 순수 신규)
+  const newCustomerSlots = slots.filter(s => getCustomerType(s.customer_name) === '신규')
+  const newRoadSlots = slots.filter(s => getCustomerType(s.customer_name) === '신규로드')
+  const existingRoadSlots = slots.filter(s => getCustomerType(s.customer_name) === '기존로드')
   const totalCustomers = slots.length
 
   // Daily breakdown
@@ -299,12 +303,17 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
               </div>
             )}
 
-            {/* SMS Discount Customers */}
-            {smsDiscountSlots.length > 0 && (
-              <div className="bg-white dark:bg-[#161b27] rounded-xl border border-slate-200 dark:border-slate-700/40 overflow-hidden">
+            {/* Customer Detail Tables */}
+            {[
+              { title: '신규 고객', data: newCustomerSlots, color: 'text-cyan-400' },
+              { title: '신규로드 고객', data: newRoadSlots, color: 'text-rose-400' },
+              { title: '기존로드 고객', data: existingRoadSlots, color: 'text-orange-400' },
+              { title: '문자할인 고객', data: smsDiscountSlots, color: 'text-indigo-400' },
+            ].filter(section => section.data.length > 0).map(section => (
+              <div key={section.title} className="bg-white dark:bg-[#161b27] rounded-xl border border-slate-200 dark:border-slate-700/40 overflow-hidden">
                 <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-200 dark:border-slate-700/40">
                   <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
-                    문자할인 고객 <span className="text-slate-400 font-normal">{smsDiscountSlots.length}건</span>
+                    <span className={section.color}>{section.title}</span> <span className="text-slate-400 font-normal">{section.data.length}건</span>
                   </h2>
                 </div>
                 <div className="overflow-x-auto">
@@ -319,7 +328,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {smsDiscountSlots
+                      {section.data
                         .sort((a, b) => a.work_date.localeCompare(b.work_date))
                         .map((s, i) => (
                         <tr key={s.id} className={`border-t border-slate-100 dark:border-slate-800 ${i % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-slate-800/20'}`}>
@@ -334,7 +343,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
                   </table>
                 </div>
               </div>
-            )}
+            ))}
           </>
         )}
       </div>
