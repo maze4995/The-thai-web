@@ -27,6 +27,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const [selectedTherapistId, setSelectedTherapistId] = useState<string | null>(null)
   const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
   const { theme, toggle } = useTheme()
+  const dateInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = useCallback(async (workDate: string) => {
     const [attendanceRes, slotsRes] = await Promise.all([
@@ -278,30 +279,39 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3">
           <h1 className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-tight shrink-0">The Thai</h1>
 
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-1.5">
             <button
               onClick={() => navigateDate(-1)}
-              className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
+              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-xs sm:text-sm transition-colors"
             >
               ←
             </button>
             <button
               onClick={goToToday}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
-                isToday ? 'bg-emerald-800/60 text-emerald-300 border border-emerald-700' : 'bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+              className={`px-2 sm:px-2.5 h-7 sm:h-8 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
+                isToday ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
               }`}
             >
               오늘
             </button>
-            <input
-              type="date"
-              value={date}
-              onChange={e => e.target.value && setDate(e.target.value)}
-              className="px-3 sm:px-4 py-1 sm:py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded text-xs sm:text-sm font-semibold min-w-[140px] sm:min-w-[200px] text-center text-slate-900 dark:text-slate-100 border-none outline-none cursor-pointer [color-scheme:dark]"
-            />
+            <div className="relative">
+              <button
+                onClick={() => dateInputRef.current?.showPicker()}
+                className="px-3 sm:px-4 h-7 sm:h-8 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold min-w-[130px] sm:min-w-[180px] text-center text-slate-900 dark:text-slate-100 transition-colors"
+              >
+                {formatDate(dateObj)}
+              </button>
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={date}
+                onChange={e => e.target.value && setDate(e.target.value)}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
+            </div>
             <button
               onClick={() => navigateDate(1)}
-              className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
+              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-xs sm:text-sm transition-colors"
             >
               →
             </button>
