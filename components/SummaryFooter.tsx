@@ -9,12 +9,15 @@ interface Props {
 }
 
 export function SummaryFooter({ slots, therapists }: Props) {
-  // Total revenue: sum all prices (coupon with price=0 adds nothing, coupon with price>0 counts)
-  const total = slots.reduce((s, slot) => s + slot.service_price, 0)
-  const cash = slots.filter(s => s.payment_type === 'cash').reduce((s, slot) => s + slot.service_price, 0)
-  const card = slots.filter(s => s.payment_type === 'card').reduce((s, slot) => s + slot.service_price, 0)
-  const transfer = slots.filter(s => s.payment_type === 'transfer').reduce((s, slot) => s + slot.service_price, 0)
-  const couponCount = slots.filter(s => s.memo?.includes('CM')).length
+  // Special (스페셜) takes priority over CM — included in revenue
+  const isSpecial = (s: ScheduleSlot) => s.memo?.includes('스페셜')
+  const isCoupon = (s: ScheduleSlot) => s.memo?.includes('CM') && !isSpecial(s)
+  const revenueSlots = slots.filter(s => !isCoupon(s))
+  const total = revenueSlots.reduce((s, slot) => s + slot.service_price, 0)
+  const cash = revenueSlots.filter(s => s.payment_type === 'cash').reduce((s, slot) => s + slot.service_price, 0)
+  const card = revenueSlots.filter(s => s.payment_type === 'card').reduce((s, slot) => s + slot.service_price, 0)
+  const transfer = revenueSlots.filter(s => s.payment_type === 'transfer').reduce((s, slot) => s + slot.service_price, 0)
+  const couponCount = slots.filter(s => isCoupon(s)).length
   const totalCustomers = slots.length
 
   // Customer type stats
