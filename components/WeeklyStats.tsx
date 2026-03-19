@@ -153,21 +153,17 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
             >
               이번주
             </button>
-            <label className="relative cursor-pointer">
-              <span className="block px-3 sm:px-4 h-7 sm:h-8 leading-7 sm:leading-8 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold min-w-[120px] sm:min-w-[160px] text-center text-slate-900 dark:text-slate-100 transition-colors">
-                {formatShort(weekDates[0])} ~ {formatShort(weekDates[6])}
-              </span>
-              <input
-                type="date"
-                value={weekStart}
-                onChange={e => {
-                  if (!e.target.value) return
-                  const monday = getMonday(e.target.value)
-                  setWeekStart(toDateString(monday))
-                }}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-            </label>
+            <input
+              type="date"
+              value={weekStart}
+              onChange={e => {
+                if (!e.target.value) return
+                const monday = getMonday(e.target.value)
+                setWeekStart(toDateString(monday))
+              }}
+              className="h-7 sm:h-8 px-2 sm:px-3 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 border-none outline-none cursor-pointer transition-colors"
+              style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
+            />
             <button
               onClick={() => navigateWeek(1)}
               className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-xs sm:text-sm transition-colors"

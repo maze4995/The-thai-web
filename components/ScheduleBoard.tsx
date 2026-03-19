@@ -293,17 +293,13 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
             >
               오늘
             </button>
-            <label className="relative cursor-pointer">
-              <span className="block px-3 sm:px-4 h-7 sm:h-8 leading-7 sm:leading-8 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold min-w-[130px] sm:min-w-[180px] text-center text-slate-900 dark:text-slate-100 transition-colors">
-                {formatDate(dateObj)}
-              </span>
-              <input
-                type="date"
-                value={date}
-                onChange={e => e.target.value && setDate(e.target.value)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-            </label>
+            <input
+              type="date"
+              value={date}
+              onChange={e => e.target.value && setDate(e.target.value)}
+              className="h-7 sm:h-8 px-2 sm:px-3 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 border-none outline-none cursor-pointer transition-colors"
+              style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
+            />
             <button
               onClick={() => navigateDate(1)}
               className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-xs sm:text-sm transition-colors"
