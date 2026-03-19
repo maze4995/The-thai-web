@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Therapist } from '@/lib/types'
-import { formatPrice, toDateString, getServiceCommission, getCustomerType } from '@/lib/utils'
+import { formatPrice, toDateString, getServiceCommission, getCustomerType, formatPhone } from '@/lib/utils'
 import { useTheme } from './ThemeProvider'
 
 interface Props {
@@ -334,7 +334,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
                         <tr key={s.id} className={`border-t border-slate-100 dark:border-slate-800 ${i % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-slate-800/20'}`}>
                           <td className="px-2 sm:px-3 py-2 text-slate-700 dark:text-slate-300">{formatShort(s.work_date)}</td>
                           <td className="px-2 sm:px-3 py-2 font-medium text-slate-700 dark:text-slate-300">{s.customer_name}</td>
-                          <td className="px-2 sm:px-3 py-2 text-slate-700 dark:text-slate-300">{s.customer_phone || '-'}</td>
+                          <td className="px-2 sm:px-3 py-2 text-slate-700 dark:text-slate-300">{s.customer_phone ? formatPhone(s.customer_phone) : '-'}</td>
                           <td className="px-2 sm:px-3 py-2 text-emerald-600 dark:text-emerald-400">{s.service_name}</td>
                           <td className="px-2 sm:px-3 py-2 text-right font-semibold text-slate-700 dark:text-slate-300">{formatPrice(s.service_price)}</td>
                         </tr>

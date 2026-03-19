@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Reservation, PaymentType } from '@/lib/types'
-import { SERVICES, PAYMENT_LABELS, addMinutesToTime, getServiceDuration, mapServiceName, getServicePrice, getAutoMemo } from '@/lib/utils'
+import { SERVICES, PAYMENT_LABELS, addMinutesToTime, getServiceDuration, mapServiceName, getServicePrice, getAutoMemo, formatPhone } from '@/lib/utils'
 
 interface Props {
   therapistId: string
@@ -217,7 +217,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
                         <span className="text-slate-500 dark:text-slate-400 text-xs">{res.reserved_time?.slice(0, 5)}</span>
                       </div>
                       <div className="flex gap-2 mt-1">
-                        <span className="text-slate-500 dark:text-slate-400 text-xs">{res.customer_phone}</span>
+                        <span className="text-slate-500 dark:text-slate-400 text-xs">{formatPhone(res.customer_phone)}</span>
                         <span className="text-emerald-600 dark:text-emerald-400 text-xs font-medium">{res.service_name}</span>
                       </div>
                     </button>
