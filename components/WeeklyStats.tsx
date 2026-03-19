@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Therapist } from '@/lib/types'
 import { formatPrice, toDateString, getServiceCommission, getCustomerType, formatPhone } from '@/lib/utils'
@@ -39,7 +39,6 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   const [therapists] = useState(initialTherapists)
   const [loading, setLoading] = useState(true)
   const { theme, toggle } = useTheme()
-  const dateInputRef = useRef<HTMLInputElement>(null)
 
   const weekDates = getWeekDates(weekStart)
   const weekEnd = weekDates[6]
@@ -154,15 +153,11 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
             >
               이번주
             </button>
-            <div className="relative">
-              <button
-                onClick={() => dateInputRef.current?.showPicker()}
-                className="px-3 sm:px-4 h-7 sm:h-8 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold min-w-[120px] sm:min-w-[160px] text-center text-slate-900 dark:text-slate-100 transition-colors"
-              >
+            <label className="relative cursor-pointer">
+              <span className="block px-3 sm:px-4 h-7 sm:h-8 leading-7 sm:leading-8 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold min-w-[120px] sm:min-w-[160px] text-center text-slate-900 dark:text-slate-100 transition-colors">
                 {formatShort(weekDates[0])} ~ {formatShort(weekDates[6])}
-              </button>
+              </span>
               <input
-                ref={dateInputRef}
                 type="date"
                 value={weekStart}
                 onChange={e => {
@@ -170,9 +165,9 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
                   const monday = getMonday(e.target.value)
                   setWeekStart(toDateString(monday))
                 }}
-                className="absolute inset-0 opacity-0 cursor-pointer"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-            </div>
+            </label>
             <button
               onClick={() => navigateWeek(1)}
               className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-xs sm:text-sm transition-colors"

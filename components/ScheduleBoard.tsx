@@ -27,7 +27,6 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const [selectedTherapistId, setSelectedTherapistId] = useState<string | null>(null)
   const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
   const { theme, toggle } = useTheme()
-  const dateInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = useCallback(async (workDate: string) => {
     const [attendanceRes, slotsRes] = await Promise.all([
@@ -294,21 +293,17 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
             >
               오늘
             </button>
-            <div className="relative">
-              <button
-                onClick={() => dateInputRef.current?.showPicker()}
-                className="px-3 sm:px-4 h-7 sm:h-8 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold min-w-[130px] sm:min-w-[180px] text-center text-slate-900 dark:text-slate-100 transition-colors"
-              >
+            <label className="relative cursor-pointer">
+              <span className="block px-3 sm:px-4 h-7 sm:h-8 leading-7 sm:leading-8 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold min-w-[130px] sm:min-w-[180px] text-center text-slate-900 dark:text-slate-100 transition-colors">
                 {formatDate(dateObj)}
-              </button>
+              </span>
               <input
-                ref={dateInputRef}
                 type="date"
                 value={date}
                 onChange={e => e.target.value && setDate(e.target.value)}
-                className="absolute inset-0 opacity-0 cursor-pointer"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-            </div>
+            </label>
             <button
               onClick={() => navigateDate(1)}
               className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-xs sm:text-sm transition-colors"
