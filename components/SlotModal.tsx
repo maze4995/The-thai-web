@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Reservation, PaymentType } from '@/lib/types'
-import { SERVICES, PAYMENT_LABELS, addMinutesToTime, getServiceDuration, mapServiceName, getServicePrice, getAutoMemo, formatPhone } from '@/lib/utils'
+import { SERVICES, PAYMENT_LABELS, addMinutesToTime, getServiceDuration, mapServiceName, getServicePrice, getAutoMemo, formatPhone, isReservationInBusinessDay } from '@/lib/utils'
 
 interface Props {
   therapistId: string
@@ -41,8 +41,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
   useEffect(() => {
     const fetchReservations = async () => {
       setLoadingRes(true)
-      // Business day: workDate 06:00 ~ next day 05:59
-      // Fetch same-date (time >= 06:00) + next-date (time < 06:00)
+      // Fetch both workDate and next day, then filter client-side using isReservationInBusinessDay
       const nextDay = new Date(workDate + 'T00:00:00')
       nextDay.setDate(nextDay.getDate() + 1)
       const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`
@@ -50,16 +49,15 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
       const [sameDayRes, nextDayRes] = await Promise.all([
         supabase.from('reservations').select('*')
           .eq('reserved_date', workDate)
-          .gte('reserved_time', '06:00')
           .eq('status', '예약확정')
           .order('reserved_time'),
         supabase.from('reservations').select('*')
           .eq('reserved_date', nextDayStr)
-          .lt('reserved_time', '06:00')
           .eq('status', '예약확정')
           .order('reserved_time'),
       ])
-      setReservations([...(sameDayRes.data ?? []), ...(nextDayRes.data ?? [])])
+      const all = [...(sameDayRes.data ?? []), ...(nextDayRes.data ?? [])]
+      setReservations(all.filter(r => isReservationInBusinessDay(r.reserved_date, r.reserved_time, workDate)))
       setLoadingRes(false)
     }
     fetchReservations()
