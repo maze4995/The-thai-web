@@ -9,10 +9,11 @@ interface Props {
 }
 
 export function SummaryFooter({ slots, therapists }: Props) {
-  // Special (스페셜) takes priority over CM — included in revenue
+  // 스페셜 and CM can coexist on same slot
   const isSpecial = (s: ScheduleSlot) => s.memo?.includes('스페셜')
-  const isCoupon = (s: ScheduleSlot) => /cm/i.test(s.memo ?? '') && !isSpecial(s)
-  const revenueSlots = slots.filter(s => !isCoupon(s))
+  const isCoupon = (s: ScheduleSlot) => /cm/i.test(s.memo ?? '')
+  // Revenue: exclude pure CM (without 스페셜). 스페셜+CM → included in revenue
+  const revenueSlots = slots.filter(s => !isCoupon(s) || isSpecial(s))
   const total = revenueSlots.reduce((s, slot) => s + slot.service_price, 0)
   const cash = revenueSlots.filter(s => s.payment_type === 'cash').reduce((s, slot) => s + slot.service_price, 0)
   const card = revenueSlots.filter(s => s.payment_type === 'card').reduce((s, slot) => s + slot.service_price, 0)

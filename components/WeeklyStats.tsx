@@ -72,13 +72,14 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   // --- Calculations ---
   // Special: memo contains '스페셜' (coupon purchase customer, INCLUDED in revenue)
   const isSpecial = (s: ScheduleSlot) => s.memo?.includes('스페셜')
-  // Coupon slots: memo contains 'CM'/'cm' BUT NOT '스페셜' (free coupon use, excluded from revenue)
-  const isCoupon = (s: ScheduleSlot) => /cm/i.test(s.memo ?? '') && !isSpecial(s)
+  // Coupon slots: memo contains 'CM'/'cm' (can coexist with 스페셜)
+  const isCoupon = (s: ScheduleSlot) => /cm/i.test(s.memo ?? '')
   // 문자할인: memo contains '문자할인'
   const isSmsDiscount = (s: ScheduleSlot) => s.memo?.includes('문자할인')
 
   // Total revenue: exclude CM coupon, but INCLUDE 스페셜
-  const revenueSlots = slots.filter(s => !isCoupon(s))
+  // Revenue: exclude pure CM (without 스페셜). 스페셜+CM → included in revenue
+  const revenueSlots = slots.filter(s => !isCoupon(s) || isSpecial(s))
   const totalRevenue = revenueSlots.reduce((sum, s) => sum + s.service_price, 0)
   const cashTotal = revenueSlots.filter(s => s.payment_type === 'cash').reduce((sum, s) => sum + s.service_price, 0)
   const cardTotal = revenueSlots.filter(s => s.payment_type === 'card').reduce((sum, s) => sum + s.service_price, 0)
@@ -99,7 +100,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   // Daily breakdown
   const dailyData = weekDates.map((date, i) => {
     const daySlots = slots.filter(s => s.work_date === date)
-    const nonCoupon = daySlots.filter(s => !isCoupon(s))
+    const nonCoupon = daySlots.filter(s => !isCoupon(s) || isSpecial(s))
     return {
       date,
       label: DAY_LABELS[i],
