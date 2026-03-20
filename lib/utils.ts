@@ -154,22 +154,23 @@ export function getBusinessDate(date: Date): string {
 /**
  * Check if a reservation belongs to a business date.
  * Business day: date 06:00 ~ next day 05:59
+ *
+ * Converts reservation's date+time into a business date, then compares.
+ * If no time: uses reserved_date directly as business date
+ * (e.g. 03-21 with no time → business date 03-21, matching if businessDate is 03-21)
  */
 export function isReservationInBusinessDay(reservedDate: string, reservedTime: string | null, businessDate: string): boolean {
-  // Same date, time >= 06:00 (or no time specified)
-  if (reservedDate === businessDate) {
-    if (!reservedTime) return true
-    return reservedTime.slice(0, 5) >= '06:00'
+  if (!reservedTime) {
+    // No time info: treat reserved_date as the business date
+    return reservedDate === businessDate
   }
-  // Next calendar date, time < 06:00 (late night)
-  const nextDay = new Date(businessDate + 'T00:00:00')
-  nextDay.setDate(nextDay.getDate() + 1)
-  const nextDayStr = toDateString(nextDay)
-  if (reservedDate === nextDayStr) {
-    if (!reservedTime) return false
-    return reservedTime.slice(0, 5) < '06:00'
-  }
-  return false
+  // Build a Date from reserved_date + reserved_time and compute its business date
+  const timeStr = reservedTime.slice(0, 5)
+  const [h, m] = timeStr.split(':').map(Number)
+  const dt = new Date(reservedDate + 'T00:00:00')
+  dt.setHours(h, m, 0, 0)
+  const resBizDate = getBusinessDate(dt)
+  return resBizDate === businessDate
 }
 
 /**
