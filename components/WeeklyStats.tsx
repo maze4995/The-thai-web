@@ -72,8 +72,8 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   // --- Calculations ---
   // Special: memo contains '스페셜' (coupon purchase customer, INCLUDED in revenue)
   const isSpecial = (s: ScheduleSlot) => s.memo?.includes('스페셜')
-  // Coupon slots: memo contains 'CM' BUT NOT '스페셜' (free coupon use, excluded from revenue)
-  const isCoupon = (s: ScheduleSlot) => s.memo?.includes('CM') && !isSpecial(s)
+  // Coupon slots: memo contains 'CM'/'cm' BUT NOT '스페셜' (free coupon use, excluded from revenue)
+  const isCoupon = (s: ScheduleSlot) => /cm/i.test(s.memo ?? '') && !isSpecial(s)
   // 문자할인: memo contains '문자할인'
   const isSmsDiscount = (s: ScheduleSlot) => s.memo?.includes('문자할인')
 
