@@ -173,22 +173,27 @@ export function isReservationInBusinessDay(reservedDate: string, reservedTime: s
   return resBizDate === businessDate
 }
 
+/** Check if customer with 'New' is truly new (visit count is (0)(0)) */
+function isTrulyNew(customerName: string): boolean {
+  if (!customerName.includes('New')) return false
+  // If no visit count pattern at all, treat as new
+  if (!/\(\d+\)/.test(customerName)) return true
+  // Only truly new if visit count is (0)(0)
+  return /\(0\)\s*\(0\)/.test(customerName)
+}
+
 /**
  * Generate auto-memo based on customer name patterns.
- * - 마통-New- → 마통신규
- * - 하이-New  → 하이신규
- * - 마맵-New  → 마맵신규
- * - 로드-New- → 신규로드
- * - *New* (other) → 신규
- * - 로드 (without New) → 기존로드
+ * New is only treated as 신규 when visit count is (0)(0)
  */
 export function getAutoMemo(customerName: string): string {
   const parts: string[] = []
-  if (customerName.includes('마통-New')) parts.push('마통신규')
-  else if (customerName.includes('하이-New')) parts.push('하이신규')
-  else if (customerName.includes('마맵-New')) parts.push('마맵신규')
-  else if (customerName.includes('로드-New')) parts.push('신규로드')
-  else if (customerName.includes('New')) parts.push('신규')
+  const isNew = isTrulyNew(customerName)
+  if (isNew && customerName.includes('마통-New')) parts.push('마통신규')
+  else if (isNew && customerName.includes('하이-New')) parts.push('하이신규')
+  else if (isNew && customerName.includes('마맵-New')) parts.push('마맵신규')
+  else if (isNew && customerName.includes('로드-New')) parts.push('신규로드')
+  else if (isNew) parts.push('신규')
   else if (customerName.includes('로드')) parts.push('기존로드')
   if (customerName.includes('CM')) parts.push('CM')
   return parts.join(' ')
@@ -196,11 +201,11 @@ export function getAutoMemo(customerName: string): string {
 
 /**
  * Classify customer type for statistics.
- * Returns: '신규로드' | '기존로드' | '신규' | null
+ * New is only treated as 신규 when visit count is (0)(0)
  */
 export function getCustomerType(customerName: string): '신규로드' | '기존로드' | '신규' | null {
   const isRoad = customerName.includes('로드')
-  const isNew = customerName.includes('New')
+  const isNew = isTrulyNew(customerName)
   if (isRoad && isNew) return '신규로드'
   if (isRoad && !isNew) return '기존로드'
   if (isNew && !isRoad) return '신규'

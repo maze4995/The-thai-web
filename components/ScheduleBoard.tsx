@@ -26,15 +26,19 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedTherapistId, setSelectedTherapistId] = useState<string | null>(null)
   const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
+  const [manager, setManager] = useState('')
+  const [editingManager, setEditingManager] = useState(false)
   const { theme, toggle } = useTheme()
 
   const fetchData = useCallback(async (workDate: string) => {
-    const [attendanceRes, slotsRes] = await Promise.all([
+    const [attendanceRes, slotsRes, managerRes] = await Promise.all([
       supabase.from('daily_attendance').select('*').eq('work_date', workDate),
       supabase.from('schedule_slots').select('*').eq('work_date', workDate),
+      supabase.from('daily_settings').select('manager').eq('work_date', workDate).single(),
     ])
     setAttendance(attendanceRes.data ?? [])
     setSlots(slotsRes.data ?? [])
+    setManager(managerRes.data?.manager ?? '')
   }, [])
 
   // On mount, always reset to today's business date
@@ -180,6 +184,12 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
 
   const goToToday = () => setDate(getBusinessDate(new Date()))
 
+  const saveManager = async (name: string) => {
+    setManager(name)
+    setEditingManager(false)
+    await supabase.from('daily_settings').upsert({ work_date: date, manager: name }, { onConflict: 'work_date' })
+  }
+
   const presentTherapists: TherapistWithSlots[] = therapists
     .map(t => {
       const att = attendance.find(a => a.therapist_id === t.id)
@@ -276,7 +286,27 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       {/* Header - single row */}
       <header className="shrink-0 bg-white dark:bg-[#161b27] border-b border-slate-200 dark:border-slate-700/60">
         <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3">
-          <h1 className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-tight shrink-0">The Thai</h1>
+          <div className="flex items-center gap-2 shrink-0">
+            <h1 className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">The Thai</h1>
+            {editingManager ? (
+              <input
+                autoFocus
+                type="text"
+                defaultValue={manager}
+                placeholder="담당자"
+                onBlur={e => saveManager(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveManager((e.target as HTMLInputElement).value) }}
+                className="w-16 sm:w-20 h-6 px-1.5 bg-slate-50 dark:bg-slate-800 border border-emerald-500 rounded text-[10px] sm:text-xs text-slate-900 dark:text-slate-100 outline-none"
+              />
+            ) : (
+              <button
+                onClick={() => setEditingManager(true)}
+                className="h-6 px-1.5 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 transition-colors"
+              >
+                {manager || '담당자'}
+              </button>
+            )}
+          </div>
 
           <div className="flex items-center gap-1 sm:gap-1.5">
             <button
