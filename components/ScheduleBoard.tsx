@@ -30,7 +30,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const [manager, setManager] = useState('')
   const [editingManager, setEditingManager] = useState(false)
   const { theme, toggle } = useTheme()
-  const { storeId } = useStore()
+  const { storeId, signOut } = useStore()
 
   const fetchData = useCallback(async (workDate: string) => {
     const [attendanceRes, slotsRes, managerRes] = await Promise.all([
@@ -367,6 +367,12 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
             >
               ?
             </a>
+            <button
+              onClick={signOut}
+              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-red-200 dark:hover:bg-red-900/40 hover:text-red-600 dark:hover:text-red-400 rounded text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 transition-colors"
+            >
+              로그아웃
+            </button>
           </div>
         </div>
       </header>
