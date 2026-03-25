@@ -50,6 +50,7 @@ export const PAYMENT_LABELS: Record<string, string> = {
   card: '카드',
   transfer: '이체',
   coupon: '쿠폰',
+  mixed: '복합',
 }
 
 export const PAYMENT_COLORS: Record<string, string> = {
@@ -57,6 +58,19 @@ export const PAYMENT_COLORS: Record<string, string> = {
   card: 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700',
   transfer: 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700',
   coupon: 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700',
+  mixed: 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700',
+}
+
+/** 메모에서 복합결제 조합 문자열 파싱. "복합[현금+카드] ..." → "현금+카드" */
+export function parseMixedCombo(memo: string): string {
+  const m = memo.match(/^복합\[([^\]]+)\]/)
+  return m ? m[1] : ''
+}
+
+/** 복합결제 조합을 메모에 설정 (기존 복합 prefix 교체) */
+export function setMixedComboMemo(combo: string, existingMemo: string): string {
+  const cleaned = existingMemo.replace(/^복합\[[^\]]*\]\s*/, '').trim()
+  return combo ? `복합[${combo}] ${cleaned}`.trim() : cleaned
 }
 
 export interface ServiceOption {

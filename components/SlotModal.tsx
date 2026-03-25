@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Reservation, PaymentType } from '@/lib/types'
-import { SERVICES, PAYMENT_LABELS, addMinutesToTime, getServiceDuration, mapServiceName, getServicePrice, getAutoMemo, formatPhone, isReservationInBusinessDay } from '@/lib/utils'
+import { SERVICES, PAYMENT_LABELS, addMinutesToTime, getServiceDuration, mapServiceName, getServicePrice, getAutoMemo, formatPhone, isReservationInBusinessDay, parseMixedCombo, setMixedComboMemo } from '@/lib/utils'
 
 interface Props {
   therapistId: string
@@ -16,7 +16,17 @@ interface Props {
 type TabType = 'reservation' | 'manual'
 
 const ROOMS = [1, 2, 3, 5, 6, 7]
-const PAYMENT_TYPES: PaymentType[] = ['cash', 'card', 'transfer', 'coupon']
+const PAYMENT_TYPES: PaymentType[] = ['cash', 'card', 'transfer', 'coupon', 'mixed']
+const BASE_PAYMENT_TYPES: PaymentType[] = ['cash', 'card', 'transfer', 'coupon']
+
+const METHOD_TO_LABEL: Record<string, string> = { cash: '현금', card: '카드', transfer: '이체', coupon: '쿠폰' }
+const LABEL_TO_METHOD: Record<string, PaymentType> = { '현금': 'cash', '카드': 'card', '이체': 'transfer', '쿠폰': 'coupon' }
+
+function parseMixedMethods(memo: string): PaymentType[] {
+  const combo = parseMixedCombo(memo)
+  if (!combo) return []
+  return combo.split('+').map(l => LABEL_TO_METHOD[l]).filter(Boolean) as PaymentType[]
+}
 
 export function SlotModal({ therapistId, therapistName, workDate, editingSlot, onClose }: Props) {
   const [tab, setTab] = useState<TabType>(editingSlot ? 'manual' : 'reservation')
@@ -33,6 +43,9 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
   const [checkIn, setCheckIn] = useState(editingSlot?.check_in_time ? editingSlot.check_in_time.slice(0, 5) : '')
   const [checkOut, setCheckOut] = useState(editingSlot?.check_out_time ? editingSlot.check_out_time.slice(0, 5) : '')
   const [paymentType, setPaymentType] = useState<PaymentType>(editingSlot?.payment_type ?? 'cash')
+  const [mixedMethods, setMixedMethods] = useState<PaymentType[]>(
+    editingSlot?.payment_type === 'mixed' ? parseMixedMethods(editingSlot.memo ?? '') : []
+  )
   const [reservationId, setReservationId] = useState<string | null>(editingSlot?.reservation_id ?? null)
   const [memo, setMemo] = useState(editingSlot?.memo ?? '')
   const [saving, setSaving] = useState(false)
@@ -102,9 +115,21 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
     setTab('manual')
   }
 
+  const toggleMixedMethod = (method: PaymentType) => {
+    setMixedMethods(prev =>
+      prev.includes(method) ? prev.filter(m => m !== method) : [...prev, method]
+    )
+  }
+
   const handleSave = async () => {
     if (!customerPhone) return
     setSaving(true)
+
+    let finalMemo = memo
+    if (paymentType === 'mixed') {
+      const combo = mixedMethods.map(m => METHOD_TO_LABEL[m]).join('+')
+      finalMemo = setMixedComboMemo(combo, memo)
+    }
 
     const payload = {
       therapist_id: therapistId,
@@ -119,7 +144,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
       check_in_time: checkIn || null,
       check_out_time: checkOut || null,
       payment_type: paymentType,
-      memo,
+      memo: finalMemo,
     }
 
     if (editingSlot) {
@@ -307,19 +332,21 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
 
                 <div>
                   <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">결제방식</label>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1.5">
                     {PAYMENT_TYPES.map(pt => (
                       <button
                         key={pt}
                         onClick={() => {
                           setPaymentType(pt)
                           if (pt === 'coupon') setServicePrice(0)
+                          if (pt !== 'mixed') setMixedMethods([])
                         }}
                         className={`py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                           paymentType === pt
                             ? pt === 'cash' ? 'bg-emerald-800 text-emerald-200 border border-emerald-600'
                               : pt === 'card' ? 'bg-blue-800 text-blue-200 border border-blue-600'
                               : pt === 'transfer' ? 'bg-purple-800 text-purple-200 border border-purple-600'
+                              : pt === 'mixed' ? 'bg-orange-700 text-orange-200 border border-orange-500'
                               : 'bg-amber-800 text-amber-200 border border-amber-600'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500'
                         }`}
@@ -328,6 +355,29 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
                       </button>
                     ))}
                   </div>
+                  {paymentType === 'mixed' && (
+                    <div className="mt-2">
+                      <label className="block text-xs text-orange-400 mb-1">결제수단 선택 (2개 이상)</label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {BASE_PAYMENT_TYPES.map(pt => (
+                          <button
+                            key={pt}
+                            onClick={() => toggleMixedMethod(pt)}
+                            className={`py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                              mixedMethods.includes(pt)
+                                ? pt === 'cash' ? 'bg-emerald-800 text-emerald-200 border border-emerald-600'
+                                  : pt === 'card' ? 'bg-blue-800 text-blue-200 border border-blue-600'
+                                  : pt === 'transfer' ? 'bg-purple-800 text-purple-200 border border-purple-600'
+                                  : 'bg-amber-800 text-amber-200 border border-amber-600'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            {PAYMENT_LABELS[pt]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

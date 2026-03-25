@@ -1,4 +1,4 @@
-export type PaymentType = 'cash' | 'card' | 'transfer' | 'coupon'
+export type PaymentType = 'cash' | 'card' | 'transfer' | 'coupon' | 'mixed'
 
 export interface Therapist {
   id: string
