@@ -200,6 +200,8 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
 
   const sortSlots = (slotList: ScheduleSlot[]) =>
     slotList.sort((a, b) => {
+      // Primary: slot_order, secondary: check_in_time
+      if ((a.slot_order ?? 0) !== (b.slot_order ?? 0)) return (a.slot_order ?? 0) - (b.slot_order ?? 0)
       const toBizMin = (t: string | null) => {
         if (!t) return 9999
         const [h, m] = t.slice(0, 5).split(':').map(Number)
@@ -277,6 +279,36 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     // Optimistic update
     setSlots(prev => prev.map(s => s.id === slotId ? { ...s, therapist_id: targetTherapistId } : s))
     await supabase.from('schedule_slots').update({ therapist_id: targetTherapistId }).eq('id', slotId)
+  }
+
+  // Drag & drop: swap two slots (cross-column or same-column)
+  const handleSwapSlots = async (draggedSlotId: string, targetSlotId: string) => {
+    const draggedSlot = slots.find(s => s.id === draggedSlotId)
+    const targetSlot = slots.find(s => s.id === targetSlotId)
+    if (!draggedSlot || !targetSlot) return
+
+    // Swap therapist_id and slot_order
+    const newDragged = { ...draggedSlot, therapist_id: targetSlot.therapist_id, slot_order: targetSlot.slot_order }
+    const newTarget = { ...targetSlot, therapist_id: draggedSlot.therapist_id, slot_order: draggedSlot.slot_order }
+
+    // Optimistic update
+    setSlots(prev => prev.map(s => {
+      if (s.id === draggedSlotId) return newDragged
+      if (s.id === targetSlotId) return newTarget
+      return s
+    }))
+
+    // Persist both updates
+    await Promise.all([
+      supabase.from('schedule_slots').update({
+        therapist_id: newDragged.therapist_id,
+        slot_order: newDragged.slot_order,
+      }).eq('id', draggedSlotId),
+      supabase.from('schedule_slots').update({
+        therapist_id: newTarget.therapist_id,
+        slot_order: newTarget.slot_order,
+      }).eq('id', targetSlotId),
+    ])
   }
 
   // Drag & drop: reorder therapist columns (insert at position) — per-date via daily_attendance
@@ -431,6 +463,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
                 onAddSlot={() => handleAddSlot(therapist.id)}
                 onEditSlot={handleEditSlot}
                 onDropSlot={handleDropSlot}
+                onSwapSlots={handleSwapSlots}
                 onDropColumn={handleDropColumn}
               />
             ))}

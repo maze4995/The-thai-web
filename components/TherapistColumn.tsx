@@ -15,10 +15,11 @@ interface Props {
   onAddSlot: () => void
   onEditSlot: (slot: ScheduleSlot) => void
   onDropSlot: (slotId: string, therapistId: string) => void
+  onSwapSlots: (draggedSlotId: string, targetSlotId: string) => void
   onDropColumn: (draggedId: string, targetId: string, side: 'left' | 'right') => void
 }
 
-export function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, onDropSlot, onDropColumn }: Props) {
+export function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, onDropSlot, onSwapSlots, onDropColumn }: Props) {
   const emptyCount = Math.max(0, MAX_SLOTS - therapist.slots.length)
   const [slotOver, setSlotOver] = useState(false)
   const [columnDropSide, setColumnDropSide] = useState<DropSide>(null)
@@ -136,6 +137,7 @@ export function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, on
             slot={slot}
             workDate={workDate}
             onClick={() => onEditSlot(slot)}
+            onSwapSlot={onSwapSlots}
           />
         ))}
 

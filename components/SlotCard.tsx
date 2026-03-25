@@ -9,6 +9,7 @@ interface Props {
   slot: ScheduleSlot
   workDate: string
   onClick: () => void
+  onSwapSlot?: (draggedSlotId: string, targetSlotId: string) => void
 }
 
 /** Round current time up to next multiple of 10 minutes */
@@ -22,7 +23,8 @@ function roundUpTo10(date: Date): string {
   return `${String(h).padStart(2, '0')}:${String(rounded).padStart(2, '0')}`
 }
 
-export function SlotCard({ slot, workDate, onClick }: Props) {
+export function SlotCard({ slot, workDate, onClick, onSwapSlot }: Props) {
+  const [dropOver, setDropOver] = useState(false)
   const phone = getPhoneLastFour(slot.customer_phone)
   const paymentColor = PAYMENT_COLORS[slot.payment_type] ?? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600'
   const paymentLabel = (() => {
@@ -70,6 +72,32 @@ export function SlotCard({ slot, workDate, onClick }: Props) {
     }
   }
 
+  const handleSlotDragOver = (e: DragEvent) => {
+    if (e.dataTransfer.types.includes('application/slot-id')) {
+      e.preventDefault()
+      e.stopPropagation()
+      e.dataTransfer.dropEffect = 'move'
+      setDropOver(true)
+    }
+  }
+
+  const handleSlotDragLeave = (e: DragEvent) => {
+    const target = e.currentTarget as HTMLElement
+    if (!target.contains(e.relatedTarget as Node)) {
+      setDropOver(false)
+    }
+  }
+
+  const handleSlotDrop = (e: DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDropOver(false)
+    const draggedSlotId = e.dataTransfer.getData('application/slot-id')
+    if (draggedSlotId && draggedSlotId !== slot.id && onSwapSlot) {
+      onSwapSlot(draggedSlotId, slot.id)
+    }
+  }
+
   const handleArrival = async (e: React.MouseEvent) => {
     e.stopPropagation()
     const now = new Date()
@@ -87,8 +115,15 @@ export function SlotCard({ slot, workDate, onClick }: Props) {
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragOver={handleSlotDragOver}
+      onDragLeave={handleSlotDragLeave}
+      onDrop={handleSlotDrop}
       onClick={onClick}
-      className="w-full text-left rounded-lg p-1.5 sm:p-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing group border bg-slate-50 dark:bg-[#1e2535] hover:bg-slate-100 dark:hover:bg-[#252d40] border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-500"
+      className={`w-full text-left rounded-lg p-1.5 sm:p-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing group border ${
+        dropOver
+          ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-500 ring-1 ring-amber-400/50'
+          : 'bg-slate-50 dark:bg-[#1e2535] hover:bg-slate-100 dark:hover:bg-[#252d40] border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-500'
+      }`}
     >
       {/* Row 1: Phone + Room + Finished badge */}
       <div className="flex items-center justify-between mb-1 sm:mb-1.5">

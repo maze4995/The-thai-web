@@ -32,6 +32,7 @@ export interface ScheduleSlot {
   service_name: string
   service_price: number
   memo: string
+  slot_order: number
 }
 
 export interface Reservation {
