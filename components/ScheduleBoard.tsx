@@ -61,10 +61,12 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const attendanceRef = useRef(attendance)
   const slotsRef = useRef(slots)
   const dateRef = useRef(date)
+  const storeIdRef = useRef(storeId)
   useEffect(() => { therapistsRef.current = therapists }, [therapists])
   useEffect(() => { attendanceRef.current = attendance }, [attendance])
   useEffect(() => { slotsRef.current = slots }, [slots])
   useEffect(() => { dateRef.current = date }, [date])
+  useEffect(() => { storeIdRef.current = storeId }, [storeId])
 
   // Track processed reservation IDs to prevent duplicates
   const processedReservations = useRef(new Set<string>())
@@ -139,7 +141,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       const combinedMemo = [autoMemo, resMemo].filter(Boolean).join(' ')
 
       await supabase.from('schedule_slots').insert({
-        store_id: storeId,
+        store_id: storeIdRef.current,
         therapist_id: assignTo.id,
         therapist_name: assignTo.name,
         work_date: currentDate,
