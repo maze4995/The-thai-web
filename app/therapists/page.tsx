@@ -96,8 +96,6 @@ export default function TherapistsPage() {
   const handleDelete = async (therapist: Therapist) => {
     if (!confirm(`"${therapist.name}" 관리사를 영구 삭제하시겠습니까?`)) return
     setDeleting(therapist.id)
-    await supabase.from('daily_attendance').update({ therapist_id: null }).eq('therapist_id', therapist.id)
-    await supabase.from('schedule_slots').update({ therapist_name: null }).eq('therapist_name', therapist.name)
     await supabase.from('therapists').delete().eq('id', therapist.id)
     setDeleting(null)
     fetchData()
