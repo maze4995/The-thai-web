@@ -140,6 +140,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       await supabase.from('schedule_slots').insert({
         store_id: storeId,
         therapist_id: assignTo.id,
+        therapist_name: assignTo.name,
         work_date: currentDate,
         reservation_id: reservation.id,
         customer_name: reservation.customer_name,
@@ -227,7 +228,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const fromOrphans: TherapistWithSlots[] = orphanTherapistIds.map(id => {
     const att = attendance.find(a => a.therapist_id === id)
     const therapistSlots = slots.filter(s => s.therapist_id === id)
-    const name = '(삭제됨)'
+    const name = therapistSlots[0]?.therapist_name ?? '(삭제됨)'
     return {
       id,
       name,

@@ -151,6 +151,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
     const payload = {
       store_id: storeId,
       therapist_id: therapistId,
+      therapist_name: therapistName,
       work_date: workDate,
       reservation_id: reservationId,
       customer_name: customerName,

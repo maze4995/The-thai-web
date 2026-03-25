@@ -20,6 +20,7 @@ export interface ScheduleSlot {
   id: string
   reservation_id: string | null
   therapist_id: string
+  therapist_name: string | null
   room_number: number
   reserved_time: string | null
   check_in_time: string | null
