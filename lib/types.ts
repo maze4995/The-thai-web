@@ -5,6 +5,7 @@ export interface Therapist {
   name: string
   is_active: boolean
   display_order: number
+  store_id?: string
 }
 
 export interface DailyAttendance {

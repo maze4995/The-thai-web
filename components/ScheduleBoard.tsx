@@ -193,7 +193,20 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     await supabase.from('daily_settings').upsert({ store_id: storeId, work_date: date, manager: name }, { onConflict: 'store_id,work_date' })
   }
 
-  const presentTherapists: TherapistWithSlots[] = therapists
+  const sortSlots = (slotList: ScheduleSlot[]) =>
+    slotList.sort((a, b) => {
+      const toBizMin = (t: string | null) => {
+        if (!t) return 9999
+        const [h, m] = t.slice(0, 5).split(':').map(Number)
+        let v = h * 60 + m - 360
+        if (v < 0) v += 1440
+        return v
+      }
+      return toBizMin(a.check_in_time) - toBizMin(b.check_in_time)
+    })
+
+  // 기존 therapists 목록에서 출석한 관리사
+  const fromTherapists: TherapistWithSlots[] = therapists
     .map(t => {
       const att = attendance.find(a => a.therapist_id === t.id)
       return {
@@ -201,22 +214,33 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         display_order: att?.display_order ?? t.display_order,
         is_present: att?.is_present ?? false,
         attendance_id: att?.id ?? null,
-        slots: slots
-          .filter(s => s.therapist_id === t.id)
-          .sort((a, b) => {
-            // Sort by check_in_time, using business-day normalization (06:00=0, 00:00=1080)
-            const toBizMin = (t: string | null) => {
-              if (!t) return 9999 // no check-in → bottom
-              const [h, m] = t.slice(0, 5).split(':').map(Number)
-              let v = h * 60 + m - 360
-              if (v < 0) v += 1440
-              return v
-            }
-            return toBizMin(a.check_in_time) - toBizMin(b.check_in_time)
-          }),
+        slots: sortSlots(slots.filter(s => s.therapist_id === t.id)),
       }
     })
     .filter(t => t.is_present)
+
+  // 삭제된 관리사: 슬롯은 있지만 therapists 테이블에 없는 경우
+  const knownIds = new Set(therapists.map(t => t.id))
+  const orphanTherapistIds = [...new Set(
+    slots.filter(s => s.therapist_id && !knownIds.has(s.therapist_id)).map(s => s.therapist_id!)
+  )]
+  const fromOrphans: TherapistWithSlots[] = orphanTherapistIds.map(id => {
+    const att = attendance.find(a => a.therapist_id === id)
+    const therapistSlots = slots.filter(s => s.therapist_id === id)
+    const name = '(삭제됨)'
+    return {
+      id,
+      name,
+      is_active: false,
+      display_order: att?.display_order ?? 999,
+      store_id: storeId ?? '',
+      is_present: true,
+      attendance_id: att?.id ?? null,
+      slots: sortSlots(therapistSlots),
+    }
+  })
+
+  const presentTherapists: TherapistWithSlots[] = [...fromTherapists, ...fromOrphans]
     .sort((a, b) => a.display_order - b.display_order)
 
   const isToday = date === toDateString(new Date())
