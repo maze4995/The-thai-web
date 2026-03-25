@@ -89,8 +89,9 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
 
     try {
       const currentDate = dateRef.current
-      if (!isReservationInBusinessDay(reservation.reserved_date, reservation.reserved_time, currentDate)) return
-      if (reservation.status && reservation.status !== '예약확정') return
+      console.log('[AutoAssign] 시작:', { id: reservation.id, date: reservation.reserved_date, time: reservation.reserved_time, status: reservation.status, currentDate })
+      if (!isReservationInBusinessDay(reservation.reserved_date, reservation.reserved_time, currentDate)) { console.log('[AutoAssign] 스킵: 날짜 불일치'); return }
+      if (reservation.status && reservation.status !== '예약확정') { console.log('[AutoAssign] 스킵: status =', reservation.status); return }
 
       // Check if slot already exists in DB (single source of truth)
       const { data: existing } = await supabase
@@ -170,6 +171,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         fetchDataRef.current(dateRef.current)
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reservations' }, (payload) => {
+        console.log('[Realtime] reservation INSERT 수신:', payload.new)
         autoAssignReservation(payload.new as Reservation)
       })
       .subscribe()
