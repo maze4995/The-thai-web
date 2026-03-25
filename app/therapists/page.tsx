@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Therapist, DailyAttendance } from '@/lib/types'
 import { toDateString } from '@/lib/utils'
 import { useTheme } from '@/components/ThemeProvider'
+import { useStore } from '@/components/StoreProvider'
 
 interface TherapistForm {
   name: string
@@ -23,6 +24,7 @@ export default function TherapistsPage() {
   const [form, setForm] = useState<TherapistForm>(defaultForm)
   const [saving, setSaving] = useState(false)
   const { theme, toggle } = useTheme()
+  const { storeId } = useStore()
 
   const fetchData = useCallback(async () => {
     const [tRes, aRes] = await Promise.all([
@@ -51,6 +53,7 @@ export default function TherapistsPage() {
         .filter(a => a.is_present)
         .reduce((max, a) => Math.max(max, a.display_order ?? 0), -1)
       await supabase.from('daily_attendance').insert({
+        store_id: storeId,
         therapist_id: therapist.id,
         work_date: today,
         is_present: true,
@@ -82,7 +85,7 @@ export default function TherapistsPage() {
     if (editingId) {
       await supabase.from('therapists').update(form).eq('id', editingId)
     } else {
-      await supabase.from('therapists').insert(form)
+      await supabase.from('therapists').insert({ ...form, store_id: storeId })
     }
 
     setSaving(false)

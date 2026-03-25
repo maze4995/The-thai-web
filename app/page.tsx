@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { ScheduleBoard } from '@/components/ScheduleBoard'
 import { getBusinessDate } from '@/lib/utils'
 
@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
   const today = getBusinessDate(new Date())
+  const supabase = await createSupabaseServerClient()
 
   const [therapistsRes, attendanceRes, slotsRes] = await Promise.all([
     supabase.from('therapists').select('*').eq('is_active', true).order('display_order').order('name'),

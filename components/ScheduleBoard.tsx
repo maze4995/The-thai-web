@@ -8,6 +8,7 @@ import { SummaryFooter } from './SummaryFooter'
 import { SlotModal } from './SlotModal'
 import { formatDate, toDateString, getBusinessDate, mapServiceName, getServicePrice, getServiceDuration, addMinutesToTime, getAvailableRoom, isReservationInBusinessDay, getAutoMemo } from '@/lib/utils'
 import { useTheme } from './ThemeProvider'
+import { useStore } from './StoreProvider'
 
 const MAX_SLOTS = 5
 
@@ -29,6 +30,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const [manager, setManager] = useState('')
   const [editingManager, setEditingManager] = useState(false)
   const { theme, toggle } = useTheme()
+  const { storeId } = useStore()
 
   const fetchData = useCallback(async (workDate: string) => {
     const [attendanceRes, slotsRes, managerRes] = await Promise.all([
@@ -136,6 +138,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       const combinedMemo = [autoMemo, resMemo].filter(Boolean).join(' ')
 
       await supabase.from('schedule_slots').insert({
+        store_id: storeId,
         therapist_id: assignTo.id,
         work_date: currentDate,
         reservation_id: reservation.id,
@@ -187,7 +190,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const saveManager = async (name: string) => {
     setManager(name)
     setEditingManager(false)
-    await supabase.from('daily_settings').upsert({ work_date: date, manager: name }, { onConflict: 'work_date' })
+    await supabase.from('daily_settings').upsert({ store_id: storeId, work_date: date, manager: name }, { onConflict: 'store_id,work_date' })
   }
 
   const presentTherapists: TherapistWithSlots[] = therapists

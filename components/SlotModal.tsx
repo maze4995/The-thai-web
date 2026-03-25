@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Reservation, PaymentType } from '@/lib/types'
 import { SERVICES, PAYMENT_LABELS, addMinutesToTime, getServiceDuration, mapServiceName, getServicePrice, getAutoMemo, formatPhone, isReservationInBusinessDay, parseMixedEntries, buildMixedComboMemo, MixedPaymentEntry } from '@/lib/utils'
+import { useStore } from '@/components/StoreProvider'
 
 interface Props {
   therapistId: string
@@ -55,6 +56,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
   const [memo, setMemo] = useState((editingSlot?.memo ?? '').replace(/^복합\[[^\]]*\]\s*/, ''))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const { storeId } = useStore()
 
   useEffect(() => {
     const fetchReservations = async () => {
@@ -147,6 +149,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
     }
 
     const payload = {
+      store_id: storeId,
       therapist_id: therapistId,
       work_date: workDate,
       reservation_id: reservationId,

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { WeeklyStats } from '@/components/WeeklyStats'
 import { toDateString } from '@/lib/utils'
 
@@ -15,6 +15,7 @@ function getMonday(date: Date): Date {
 export default async function StatsPage() {
   const monday = getMonday(new Date())
   const weekStart = toDateString(monday)
+  const supabase = await createSupabaseServerClient()
 
   const therapistsRes = await supabase
     .from('therapists')
