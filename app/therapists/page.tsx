@@ -94,9 +94,8 @@ export default function TherapistsPage() {
   }
 
   const handleDelete = async (therapist: Therapist) => {
-    if (!confirm(`"${therapist.name}" 관리사를 영구 삭제하시겠습니까?\n관련된 출근 기록도 모두 삭제됩니다.`)) return
+    if (!confirm(`"${therapist.name}" 관리사를 영구 삭제하시겠습니까?`)) return
     setDeleting(therapist.id)
-    await supabase.from('daily_attendance').delete().eq('therapist_id', therapist.id)
     await supabase.from('therapists').delete().eq('id', therapist.id)
     setDeleting(null)
     fetchData()
