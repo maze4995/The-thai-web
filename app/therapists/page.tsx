@@ -15,7 +15,7 @@ interface TherapistForm {
 const defaultForm: TherapistForm = { name: '', is_active: true }
 
 export default function TherapistsPage() {
-  const today = toDateString(new Date())
+  const [selectedDate, setSelectedDate] = useState(toDateString(new Date()))
   const [therapists, setTherapists] = useState<Therapist[]>([])
   const [attendance, setAttendance] = useState<DailyAttendance[]>([])
   const [loading, setLoading] = useState(true)
@@ -23,18 +23,19 @@ export default function TherapistsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<TherapistForm>(defaultForm)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
   const { theme, toggle } = useTheme()
   const { storeId } = useStore()
 
   const fetchData = useCallback(async () => {
     const [tRes, aRes] = await Promise.all([
       supabase.from('therapists').select('*').order('display_order').order('name'),
-      supabase.from('daily_attendance').select('*').eq('work_date', today),
+      supabase.from('daily_attendance').select('*').eq('work_date', selectedDate),
     ])
     setTherapists(tRes.data ?? [])
     setAttendance(aRes.data ?? [])
     setLoading(false)
-  }, [today])
+  }, [selectedDate])
 
   useEffect(() => {
     fetchData()
@@ -48,14 +49,13 @@ export default function TherapistsPage() {
         .update({ is_present: !att.is_present })
         .eq('id', att.id)
     } else {
-      // New attendance: assign display_order at end of present list
       const maxOrder = attendance
         .filter(a => a.is_present)
         .reduce((max, a) => Math.max(max, a.display_order ?? 0), -1)
       await supabase.from('daily_attendance').insert({
         store_id: storeId,
         therapist_id: therapist.id,
-        work_date: today,
+        work_date: selectedDate,
         is_present: true,
         display_order: maxOrder + 1,
       })
@@ -93,6 +93,15 @@ export default function TherapistsPage() {
     fetchData()
   }
 
+  const handleDelete = async (therapist: Therapist) => {
+    if (!confirm(`"${therapist.name}" 관리사를 영구 삭제하시겠습니까?\n관련된 출근 기록도 모두 삭제됩니다.`)) return
+    setDeleting(therapist.id)
+    await supabase.from('daily_attendance').delete().eq('therapist_id', therapist.id)
+    await supabase.from('therapists').delete().eq('id', therapist.id)
+    setDeleting(null)
+    fetchData()
+  }
+
   const toggleActive = async (therapist: Therapist) => {
     await supabase
       .from('therapists')
@@ -104,14 +113,11 @@ export default function TherapistsPage() {
   const moveTherapist = async (index: number, direction: -1 | 1) => {
     const targetIndex = index + direction
     if (targetIndex < 0 || targetIndex >= therapists.length) return
-    // Remove and re-insert
     const reordered = [...therapists]
     const [moved] = reordered.splice(index, 1)
     reordered.splice(targetIndex, 0, moved)
-    // Assign sequential display_order
     const updated = reordered.map((t, i) => ({ ...t, display_order: i }))
     setTherapists(updated)
-    // Persist changed ones
     const changes = updated.filter((t, i) => therapists.find(s => s.id === t.id)?.display_order !== i)
     await Promise.all(
       changes.map(t => supabase.from('therapists').update({ display_order: t.display_order }).eq('id', t.id))
@@ -122,6 +128,15 @@ export default function TherapistsPage() {
     const att = attendance.find(a => a.therapist_id === therapistId)
     return att?.is_present ?? false
   }
+
+  const goToday = () => setSelectedDate(toDateString(new Date()))
+  const goDay = (offset: number) => {
+    const d = new Date(selectedDate)
+    d.setDate(d.getDate() + offset)
+    setSelectedDate(toDateString(d))
+  }
+
+  const isToday = selectedDate === toDateString(new Date())
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-[#0f1117] text-slate-800 dark:text-slate-200">
@@ -149,11 +164,41 @@ export default function TherapistsPage() {
       </header>
 
       <div className="p-5 max-w-3xl mx-auto">
-        {/* Today's attendance section */}
+        {/* Date picker + attendance section */}
         <div className="mb-6">
-          <h2 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wide">
-            오늘 출근 · {today}
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">
+              출근 관리
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => goDay(-1)}
+                className="px-2 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-sm transition-colors"
+              >
+                ◀
+              </button>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+              />
+              <button
+                onClick={() => goDay(1)}
+                className="px-2 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-sm transition-colors"
+              >
+                ▶
+              </button>
+              {!isToday && (
+                <button
+                  onClick={goToday}
+                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold transition-colors"
+                >
+                  오늘
+                </button>
+              )}
+            </div>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {therapists.filter(t => t.is_active).map(t => {
               const present = isPresent(t.id)
@@ -248,6 +293,13 @@ export default function TherapistsPage() {
                       }`}
                     >
                       {t.is_active ? '비활성화' : '활성화'}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(t)}
+                      disabled={deleting === t.id}
+                      className="px-3 py-1.5 bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-800/30 rounded-lg text-xs transition-colors disabled:opacity-50"
+                    >
+                      {deleting === t.id ? '삭제중...' : '삭제'}
                     </button>
                   </div>
                 </div>
