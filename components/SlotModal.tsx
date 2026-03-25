@@ -169,7 +169,14 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
     if (editingSlot) {
       await supabase.from('schedule_slots').update(payload).eq('id', editingSlot.id)
     } else {
-      await supabase.from('schedule_slots').insert(payload)
+      // Get next slot_order for this therapist on this date
+      const { data: existing } = await supabase
+        .from('schedule_slots')
+        .select('slot_order')
+        .eq('therapist_id', therapistId)
+        .eq('work_date', workDate)
+      const maxOrder = (existing ?? []).reduce((max, s) => Math.max(max, s.slot_order ?? 0), 0)
+      await supabase.from('schedule_slots').insert({ ...payload, slot_order: maxOrder + 1 })
     }
 
     setSaving(false)

@@ -140,6 +140,10 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       const resMemo = reservation.memo ?? ''
       const combinedMemo = [autoMemo, resMemo].filter(Boolean).join(' ')
 
+      const maxOrder = currentSlots
+        .filter(s => s.therapist_id === assignTo.id)
+        .reduce((max, s) => Math.max(max, s.slot_order ?? 0), 0)
+
       await supabase.from('schedule_slots').insert({
         store_id: storeIdRef.current,
         therapist_id: assignTo.id,
@@ -156,6 +160,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         check_out_time: null,
         payment_type: 'cash',
         memo: combinedMemo,
+        slot_order: maxOrder + 1,
       })
     } finally {
       assigningLock.current = false
@@ -198,17 +203,20 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     await supabase.from('daily_settings').upsert({ store_id: storeId, work_date: date, manager: name }, { onConflict: 'store_id,work_date' })
   }
 
+  const toBizMin = (t: string | null) => {
+    if (!t) return 9999
+    const [h, m] = t.slice(0, 5).split(':').map(Number)
+    let v = h * 60 + m - 360
+    if (v < 0) v += 1440
+    return v
+  }
+
   const sortSlots = (slotList: ScheduleSlot[]) =>
     slotList.sort((a, b) => {
-      // Primary: slot_order, secondary: check_in_time
-      if ((a.slot_order ?? 0) !== (b.slot_order ?? 0)) return (a.slot_order ?? 0) - (b.slot_order ?? 0)
-      const toBizMin = (t: string | null) => {
-        if (!t) return 9999
-        const [h, m] = t.slice(0, 5).split(':').map(Number)
-        let v = h * 60 + m - 360
-        if (v < 0) v += 1440
-        return v
-      }
+      // Primary: slot_order (for manual reordering), secondary: business-day time
+      const aOrder = a.slot_order ?? toBizMin(a.check_in_time)
+      const bOrder = b.slot_order ?? toBizMin(b.check_in_time)
+      if (aOrder !== bOrder) return aOrder - bOrder
       return toBizMin(a.check_in_time) - toBizMin(b.check_in_time)
     })
 
