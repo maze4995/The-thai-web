@@ -11,11 +11,13 @@ interface Props {
   initialWeekStart: string
 }
 
+type ViewMode = 'week' | 'month'
+
 /** Get Monday of the week containing the given date */
 function getMonday(dateStr: string): Date {
   const d = new Date(dateStr + 'T00:00:00')
   const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day // Monday=1, Sunday shift back 6
+  const diff = day === 0 ? -6 : 1 - day
   d.setDate(d.getDate() + diff)
   return d
 }
@@ -31,17 +33,42 @@ function getWeekDates(mondayStr: string): string[] {
   return dates
 }
 
+/** Get all date strings for a month (YYYY-MM-01) */
+function getMonthDates(monthStart: string): string[] {
+  const dates: string[] = []
+  const d = new Date(monthStart + 'T00:00:00')
+  const month = d.getMonth()
+  while (d.getMonth() === month) {
+    dates.push(toDateString(d))
+    d.setDate(d.getDate() + 1)
+  }
+  return dates
+}
+
+function getThisMonthStart(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
+
+function getDayLabel(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  return ['일', '월', '화', '수', '목', '금', '토'][d.getDay()]
+}
+
 const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일']
 
 export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
+  const [viewMode, setViewMode] = useState<ViewMode>('week')
   const [weekStart, setWeekStart] = useState(initialWeekStart)
+  const [monthStart, setMonthStart] = useState(getThisMonthStart)
   const [slots, setSlots] = useState<ScheduleSlot[]>([])
   const [therapists] = useState(initialTherapists)
   const [loading, setLoading] = useState(true)
   const { theme, toggle } = useTheme()
 
   const weekDates = getWeekDates(weekStart)
-  const weekEnd = weekDates[6]
+  const monthDates = getMonthDates(monthStart)
+  const periodDates = viewMode === 'week' ? weekDates : monthDates
 
   const fetchWeekData = useCallback(async (start: string, end: string) => {
     setLoading(true)
@@ -55,18 +82,34 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   }, [])
 
   useEffect(() => {
-    fetchWeekData(weekDates[0], weekDates[6])
-  }, [weekStart, fetchWeekData])
+    fetchWeekData(periodDates[0], periodDates[periodDates.length - 1])
+  }, [weekStart, monthStart, viewMode, fetchWeekData])
 
-  const navigateWeek = (delta: number) => {
-    const d = new Date(weekStart + 'T00:00:00')
-    d.setDate(d.getDate() + delta * 7)
-    setWeekStart(toDateString(d))
+  const navigate = (delta: number) => {
+    if (viewMode === 'week') {
+      const d = new Date(weekStart + 'T00:00:00')
+      d.setDate(d.getDate() + delta * 7)
+      setWeekStart(toDateString(d))
+    } else {
+      const d = new Date(monthStart + 'T00:00:00')
+      d.setMonth(d.getMonth() + delta)
+      setMonthStart(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`)
+    }
   }
 
   const goThisWeek = () => {
     const monday = getMonday(toDateString(new Date()))
     setWeekStart(toDateString(monday))
+  }
+
+  const toggleViewMode = () => {
+    if (viewMode === 'week') {
+      setViewMode('month')
+      setMonthStart(getThisMonthStart())
+    } else {
+      setViewMode('week')
+      goThisWeek()
+    }
   }
 
   // --- Calculations ---
@@ -98,12 +141,12 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   const totalCustomers = slots.length
 
   // Daily breakdown
-  const dailyData = weekDates.map((date, i) => {
+  const dailyData = periodDates.map((date, i) => {
     const daySlots = slots.filter(s => s.work_date === date)
     const nonCoupon = daySlots.filter(s => !isCoupon(s) || isSpecial(s))
     return {
       date,
-      label: DAY_LABELS[i],
+      label: viewMode === 'week' ? DAY_LABELS[i] : getDayLabel(date),
       total: nonCoupon.reduce((sum, s) => sum + s.service_price, 0),
       cash: nonCoupon.filter(s => s.payment_type === 'cash').reduce((sum, s) => sum + s.service_price, 0),
       card: nonCoupon.filter(s => s.payment_type === 'card').reduce((sum, s) => sum + s.service_price, 0),
@@ -131,6 +174,8 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   }
 
   const isThisWeek = weekStart === toDateString(getMonday(toDateString(new Date())))
+  const isThisMonth = monthStart === getThisMonthStart()
+  const isCurrent = viewMode === 'week' ? isThisWeek : isThisMonth
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-[#0f1117] text-slate-800 dark:text-slate-200">
@@ -141,32 +186,45 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
 
           <div className="flex items-center gap-1 sm:gap-1.5">
             <button
-              onClick={() => navigateWeek(-1)}
+              onClick={() => navigate(-1)}
               className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-xs sm:text-sm transition-colors"
             >
               ←
             </button>
             <button
-              onClick={goThisWeek}
+              onClick={toggleViewMode}
               className={`px-2 sm:px-2.5 h-7 sm:h-8 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                isThisWeek ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+                isCurrent ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
               }`}
             >
-              이번주
+              {viewMode === 'week' ? '이번주' : '이번달'}
             </button>
-            <input
-              type="date"
-              value={weekStart}
-              onChange={e => {
-                if (!e.target.value) return
-                const monday = getMonday(e.target.value)
-                setWeekStart(toDateString(monday))
-              }}
-              className="h-7 sm:h-8 px-2 sm:px-3 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 border-none outline-none cursor-pointer transition-colors"
-              style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
-            />
+            {viewMode === 'week' ? (
+              <input
+                type="date"
+                value={weekStart}
+                onChange={e => {
+                  if (!e.target.value) return
+                  const monday = getMonday(e.target.value)
+                  setWeekStart(toDateString(monday))
+                }}
+                className="h-7 sm:h-8 px-2 sm:px-3 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 border-none outline-none cursor-pointer transition-colors"
+                style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
+              />
+            ) : (
+              <input
+                type="month"
+                value={monthStart.slice(0, 7)}
+                onChange={e => {
+                  if (!e.target.value) return
+                  setMonthStart(e.target.value + '-01')
+                }}
+                className="h-7 sm:h-8 px-2 sm:px-3 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 border-none outline-none cursor-pointer transition-colors"
+                style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
+              />
+            )}
             <button
-              onClick={() => navigateWeek(1)}
+              onClick={() => navigate(1)}
               className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-xs sm:text-sm transition-colors"
             >
               →
@@ -231,7 +289,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
             {/* Daily Breakdown Table */}
             <div className="bg-white dark:bg-[#161b27] rounded-xl border border-slate-200 dark:border-slate-700/40 overflow-hidden">
               <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-200 dark:border-slate-700/40">
-                <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">일별 매출</h2>
+                <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">{viewMode === 'week' ? '일별 매출' : '월별 일일 매출'}</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-[10px] sm:text-xs">
