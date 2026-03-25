@@ -61,15 +61,31 @@ export const PAYMENT_COLORS: Record<string, string> = {
   mixed: 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700',
 }
 
-/** 메모에서 복합결제 조합 문자열 파싱. "복합[현금+카드] ..." → "현금+카드" */
-export function parseMixedCombo(memo: string): string {
-  const m = memo.match(/^복합\[([^\]]+)\]/)
-  return m ? m[1] : ''
+export interface MixedPaymentEntry {
+  label: string  // '현금', '카드', '이체', '쿠폰'
+  amount: number
 }
 
-/** 복합결제 조합을 메모에 설정 (기존 복합 prefix 교체) */
-export function setMixedComboMemo(combo: string, existingMemo: string): string {
+/** 메모에서 복합결제 항목 파싱. "복합[현금:30000+카드:20000] ..." → [{label:'현금',amount:30000}, ...] */
+export function parseMixedEntries(memo: string): MixedPaymentEntry[] {
+  const m = memo.match(/^복합\[([^\]]+)\]/)
+  if (!m) return []
+  return m[1].split('+').map(part => {
+    const colonIdx = part.lastIndexOf(':')
+    if (colonIdx === -1) return { label: part, amount: 0 }
+    return { label: part.slice(0, colonIdx), amount: parseInt(part.slice(colonIdx + 1)) || 0 }
+  })
+}
+
+/** 메모에서 복합결제 표시용 문자열. "복합[현금:30000+카드:20000] ..." → "현금+카드" */
+export function parseMixedCombo(memo: string): string {
+  return parseMixedEntries(memo).map(e => e.label).join('+')
+}
+
+/** 복합결제 항목을 메모에 저장 (기존 복합 prefix 교체) */
+export function buildMixedComboMemo(entries: MixedPaymentEntry[], existingMemo: string): string {
   const cleaned = existingMemo.replace(/^복합\[[^\]]*\]\s*/, '').trim()
+  const combo = entries.map(e => `${e.label}:${e.amount}`).join('+')
   return combo ? `복합[${combo}] ${cleaned}`.trim() : cleaned
 }
 

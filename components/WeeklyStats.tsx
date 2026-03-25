@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Therapist } from '@/lib/types'
-import { formatPrice, toDateString, getServiceCommission, getCustomerType, formatPhone } from '@/lib/utils'
+import { formatPrice, toDateString, getServiceCommission, getCustomerType, formatPhone, parseMixedEntries } from '@/lib/utils'
 import { useTheme } from './ThemeProvider'
 
 interface Props {
@@ -124,9 +124,24 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   // Revenue: exclude pure CM (without 스페셜). 스페셜+CM → included in revenue
   const revenueSlots = slots.filter(s => !isCoupon(s) || isSpecial(s))
   const totalRevenue = revenueSlots.reduce((sum, s) => sum + s.service_price, 0)
-  const cashTotal = revenueSlots.filter(s => s.payment_type === 'cash').reduce((sum, s) => sum + s.service_price, 0)
-  const cardTotal = revenueSlots.filter(s => s.payment_type === 'card').reduce((sum, s) => sum + s.service_price, 0)
-  const transferTotal = revenueSlots.filter(s => s.payment_type === 'transfer').reduce((sum, s) => sum + s.service_price, 0)
+  const getMixedAmount = (slot: ScheduleSlot, label: string) =>
+    parseMixedEntries(slot.memo ?? '').find(e => e.label === label)?.amount ?? 0
+
+  const cashTotal = revenueSlots.reduce((sum, s) => {
+    if (s.payment_type === 'cash') return sum + s.service_price
+    if (s.payment_type === 'mixed') return sum + getMixedAmount(s, '현금')
+    return sum
+  }, 0)
+  const cardTotal = revenueSlots.reduce((sum, s) => {
+    if (s.payment_type === 'card') return sum + s.service_price
+    if (s.payment_type === 'mixed') return sum + getMixedAmount(s, '카드')
+    return sum
+  }, 0)
+  const transferTotal = revenueSlots.reduce((sum, s) => {
+    if (s.payment_type === 'transfer') return sum + s.service_price
+    if (s.payment_type === 'mixed') return sum + getMixedAmount(s, '이체')
+    return sum
+  }, 0)
   const couponCount = slots.filter(s => isCoupon(s)).length
   const specialSlots = slots.filter(s => isSpecial(s))
   const specialCount = specialSlots.length
@@ -148,9 +163,9 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
       date,
       label: viewMode === 'week' ? DAY_LABELS[i] : getDayLabel(date),
       total: nonCoupon.reduce((sum, s) => sum + s.service_price, 0),
-      cash: nonCoupon.filter(s => s.payment_type === 'cash').reduce((sum, s) => sum + s.service_price, 0),
-      card: nonCoupon.filter(s => s.payment_type === 'card').reduce((sum, s) => sum + s.service_price, 0),
-      transfer: nonCoupon.filter(s => s.payment_type === 'transfer').reduce((sum, s) => sum + s.service_price, 0),
+      cash: nonCoupon.reduce((sum, s) => s.payment_type === 'cash' ? sum + s.service_price : s.payment_type === 'mixed' ? sum + getMixedAmount(s, '현금') : sum, 0),
+      card: nonCoupon.reduce((sum, s) => s.payment_type === 'card' ? sum + s.service_price : s.payment_type === 'mixed' ? sum + getMixedAmount(s, '카드') : sum, 0),
+      transfer: nonCoupon.reduce((sum, s) => s.payment_type === 'transfer' ? sum + s.service_price : s.payment_type === 'mixed' ? sum + getMixedAmount(s, '이체') : sum, 0),
       coupon: daySlots.filter(s => isCoupon(s)).length,
       special: daySlots.filter(s => isSpecial(s)).length,
       customers: daySlots.length,

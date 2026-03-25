@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Reservation, PaymentType } from '@/lib/types'
-import { SERVICES, PAYMENT_LABELS, addMinutesToTime, getServiceDuration, mapServiceName, getServicePrice, getAutoMemo, formatPhone, isReservationInBusinessDay, parseMixedCombo, setMixedComboMemo } from '@/lib/utils'
+import { SERVICES, PAYMENT_LABELS, addMinutesToTime, getServiceDuration, mapServiceName, getServicePrice, getAutoMemo, formatPhone, isReservationInBusinessDay, parseMixedEntries, buildMixedComboMemo, MixedPaymentEntry } from '@/lib/utils'
 
 interface Props {
   therapistId: string
@@ -23,9 +23,7 @@ const METHOD_TO_LABEL: Record<string, string> = { cash: '현금', card: '카드'
 const LABEL_TO_METHOD: Record<string, PaymentType> = { '현금': 'cash', '카드': 'card', '이체': 'transfer', '쿠폰': 'coupon' }
 
 function parseMixedMethods(memo: string): PaymentType[] {
-  const combo = parseMixedCombo(memo)
-  if (!combo) return []
-  return combo.split('+').map(l => LABEL_TO_METHOD[l]).filter(Boolean) as PaymentType[]
+  return parseMixedEntries(memo).map(e => LABEL_TO_METHOD[e.label]).filter(Boolean) as PaymentType[]
 }
 
 export function SlotModal({ therapistId, therapistName, workDate, editingSlot, onClose }: Props) {
@@ -46,6 +44,13 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
   const [mixedMethods, setMixedMethods] = useState<PaymentType[]>(
     editingSlot?.payment_type === 'mixed' ? parseMixedMethods(editingSlot.memo ?? '') : []
   )
+  const [mixedAmounts, setMixedAmounts] = useState<Record<string, number>>(() => {
+    if (editingSlot?.payment_type === 'mixed') {
+      const entries = parseMixedEntries(editingSlot.memo ?? '')
+      return Object.fromEntries(entries.map(e => [e.label, e.amount]))
+    }
+    return {}
+  })
   const [reservationId, setReservationId] = useState<string | null>(editingSlot?.reservation_id ?? null)
   const [memo, setMemo] = useState(editingSlot?.memo ?? '')
   const [saving, setSaving] = useState(false)
@@ -116,9 +121,16 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
   }
 
   const toggleMixedMethod = (method: PaymentType) => {
-    setMixedMethods(prev =>
-      prev.includes(method) ? prev.filter(m => m !== method) : [...prev, method]
-    )
+    const label = METHOD_TO_LABEL[method]
+    setMixedMethods(prev => {
+      if (prev.includes(method)) {
+        setMixedAmounts(a => { const next = { ...a }; delete next[label]; return next })
+        return prev.filter(m => m !== method)
+      } else {
+        setMixedAmounts(a => ({ ...a, [label]: 0 }))
+        return [...prev, method]
+      }
+    })
   }
 
   const handleSave = async () => {
@@ -127,8 +139,11 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
 
     let finalMemo = memo
     if (paymentType === 'mixed') {
-      const combo = mixedMethods.map(m => METHOD_TO_LABEL[m]).join('+')
-      finalMemo = setMixedComboMemo(combo, memo)
+      const entries: MixedPaymentEntry[] = mixedMethods.map(m => ({
+        label: METHOD_TO_LABEL[m],
+        amount: mixedAmounts[METHOD_TO_LABEL[m]] ?? 0,
+      }))
+      finalMemo = buildMixedComboMemo(entries, memo)
     }
 
     const payload = {
@@ -356,26 +371,59 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
                     ))}
                   </div>
                   {paymentType === 'mixed' && (
-                    <div className="mt-2">
-                      <label className="block text-xs text-orange-400 mb-1">결제수단 선택 (2개 이상)</label>
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {BASE_PAYMENT_TYPES.map(pt => (
-                          <button
-                            key={pt}
-                            onClick={() => toggleMixedMethod(pt)}
-                            className={`py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                              mixedMethods.includes(pt)
-                                ? pt === 'cash' ? 'bg-emerald-800 text-emerald-200 border border-emerald-600'
-                                  : pt === 'card' ? 'bg-blue-800 text-blue-200 border border-blue-600'
-                                  : pt === 'transfer' ? 'bg-purple-800 text-purple-200 border border-purple-600'
-                                  : 'bg-amber-800 text-amber-200 border border-amber-600'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                            }`}
-                          >
-                            {PAYMENT_LABELS[pt]}
-                          </button>
-                        ))}
+                    <div className="mt-2 space-y-2">
+                      <div>
+                        <label className="block text-xs text-orange-400 mb-1">결제수단 선택 (2개 이상)</label>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {BASE_PAYMENT_TYPES.map(pt => (
+                            <button
+                              key={pt}
+                              onClick={() => toggleMixedMethod(pt)}
+                              className={`py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                mixedMethods.includes(pt)
+                                  ? pt === 'cash' ? 'bg-emerald-800 text-emerald-200 border border-emerald-600'
+                                    : pt === 'card' ? 'bg-blue-800 text-blue-200 border border-blue-600'
+                                    : pt === 'transfer' ? 'bg-purple-800 text-purple-200 border border-purple-600'
+                                    : 'bg-amber-800 text-amber-200 border border-amber-600'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                              }`}
+                            >
+                              {PAYMENT_LABELS[pt]}
+                            </button>
+                          ))}
+                        </div>
                       </div>
+                      {mixedMethods.length > 0 && (
+                        <div className="space-y-1.5">
+                          {mixedMethods.map(m => {
+                            const label = METHOD_TO_LABEL[m]
+                            return (
+                              <div key={m} className="flex items-center gap-2">
+                                <span className={`text-xs font-semibold w-8 shrink-0 ${
+                                  m === 'cash' ? 'text-emerald-400' : m === 'card' ? 'text-blue-400' : m === 'transfer' ? 'text-purple-400' : 'text-amber-400'
+                                }`}>{label}</span>
+                                <input
+                                  type="number"
+                                  value={mixedAmounts[label] ?? 0}
+                                  onChange={e => setMixedAmounts(a => ({ ...a, [label]: Number(e.target.value) }))}
+                                  step={5000}
+                                  className="flex-1 bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-orange-500"
+                                />
+                                <span className="text-xs text-slate-400 shrink-0">원</span>
+                              </div>
+                            )
+                          })}
+                          {(() => {
+                            const total = mixedMethods.reduce((s, m) => s + (mixedAmounts[METHOD_TO_LABEL[m]] ?? 0), 0)
+                            const diff = servicePrice - total
+                            return (
+                              <div className={`text-xs text-right ${diff === 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
+                                합계 {total.toLocaleString()}원 {diff !== 0 && `(${diff > 0 ? '+' : ''}${diff.toLocaleString()}원 차이)`}
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

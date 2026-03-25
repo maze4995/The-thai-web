@@ -3,7 +3,7 @@
 import { DragEvent, useState, useEffect } from 'react'
 import { ScheduleSlot } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
-import { formatTime, formatPrice, getPhoneLastFour, getServiceDuration, addMinutesToTime, getBusinessDate, PAYMENT_LABELS, PAYMENT_COLORS, parseMixedCombo } from '@/lib/utils'
+import { formatTime, formatPrice, getPhoneLastFour, getServiceDuration, addMinutesToTime, getBusinessDate, PAYMENT_LABELS, PAYMENT_COLORS, parseMixedEntries } from '@/lib/utils'
 
 interface Props {
   slot: ScheduleSlot
@@ -25,9 +25,12 @@ function roundUpTo10(date: Date): string {
 export function SlotCard({ slot, workDate, onClick }: Props) {
   const phone = getPhoneLastFour(slot.customer_phone)
   const paymentColor = PAYMENT_COLORS[slot.payment_type] ?? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600'
-  const paymentLabel = slot.payment_type === 'mixed'
-    ? (parseMixedCombo(slot.memo ?? '') || '복합')
-    : (PAYMENT_LABELS[slot.payment_type] ?? slot.payment_type)
+  const paymentLabel = (() => {
+    if (slot.payment_type !== 'mixed') return PAYMENT_LABELS[slot.payment_type] ?? slot.payment_type
+    const entries = parseMixedEntries(slot.memo ?? '')
+    if (!entries.length) return '복합'
+    return entries.map(e => `${e.label}${e.amount ? formatPrice(e.amount) : ''}`).join('+')
+  })()
 
   const hasCheckedIn = !!slot.check_in_time
 
