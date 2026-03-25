@@ -109,7 +109,7 @@ export function SlotCard({ slot, workDate, onClick }: Props) {
       <div className="flex items-center justify-between mb-1 sm:mb-1.5">
         <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs sm:text-sm">{slot.service_name}</span>
         <span className={`text-[10px] sm:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded border ${paymentColor}`}>
-          {paymentLabel} {formatPrice(slot.service_price)}
+          {paymentLabel}{slot.payment_type !== 'mixed' && ` ${formatPrice(slot.service_price)}`}
         </span>
       </div>
 

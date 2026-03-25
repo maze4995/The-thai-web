@@ -52,7 +52,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
     return {}
   })
   const [reservationId, setReservationId] = useState<string | null>(editingSlot?.reservation_id ?? null)
-  const [memo, setMemo] = useState(editingSlot?.memo ?? '')
+  const [memo, setMemo] = useState((editingSlot?.memo ?? '').replace(/^복합\[[^\]]*\]\s*/, ''))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -361,7 +361,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
                             ? pt === 'cash' ? 'bg-emerald-800 text-emerald-200 border border-emerald-600'
                               : pt === 'card' ? 'bg-blue-800 text-blue-200 border border-blue-600'
                               : pt === 'transfer' ? 'bg-purple-800 text-purple-200 border border-purple-600'
-                              : pt === 'mixed' ? 'bg-orange-700 text-orange-200 border border-orange-500'
+                              : pt === 'mixed' ? 'bg-violet-700 text-violet-200 border border-violet-500'
                               : 'bg-amber-800 text-amber-200 border border-amber-600'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500'
                         }`}
