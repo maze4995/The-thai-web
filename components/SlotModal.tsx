@@ -16,7 +16,7 @@ interface Props {
 
 type TabType = 'reservation' | 'manual'
 
-const ROOMS = [1, 2, 3, 5, 6, 7]
+const ROOMS = [1, 2, 3, 4, 5, 6, 7]
 const PAYMENT_TYPES: PaymentType[] = ['cash', 'card', 'transfer', 'coupon', 'mixed']
 const BASE_PAYMENT_TYPES: PaymentType[] = ['cash', 'card', 'transfer', 'coupon']
 
