@@ -28,7 +28,7 @@ export interface ScheduleSlot {
   work_date: string
   payment_type: PaymentType
   customer_name: string
-  customer_phone: string
+  customer_phone: string | null
   service_name: string
   service_price: number
   memo: string

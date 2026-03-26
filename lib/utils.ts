@@ -25,8 +25,10 @@ export function formatTime(time: string | null): string {
   return time.slice(0, 5)
 }
 
-export function getPhoneLastFour(phone: string): string {
+export function getPhoneLastFour(phone: string | null | undefined): string {
+  if (!phone) return '전번X'
   const digits = phone.replace(/\D/g, '')
+  if (!digits) return '전번X'
   return digits.slice(-4)
 }
 

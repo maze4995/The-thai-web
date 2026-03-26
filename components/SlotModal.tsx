@@ -136,7 +136,6 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
   }
 
   const handleSave = async () => {
-    if (!customerPhone) return
     setSaving(true)
 
     let finalMemo = memo
@@ -155,7 +154,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
       work_date: workDate,
       reservation_id: reservationId,
       customer_name: customerName,
-      customer_phone: customerPhone,
+      customer_phone: customerPhone || null,
       service_name: serviceName,
       service_price: servicePrice,
       room_number: roomNumber,
@@ -292,7 +291,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">전화번호 *</label>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">전화번호</label>
                   <input
                     type="tel"
                     value={customerPhone}
@@ -506,7 +505,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || !customerPhone}
+              disabled={saving}
               className="px-5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? '저장 중...' : editingSlot ? '수정' : '저장'}
