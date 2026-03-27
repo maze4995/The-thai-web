@@ -48,14 +48,33 @@ function defaultLog(date: string): WorkLog {
   }
 }
 
-function AutoTextarea({
+function SectionTitle({
+  index,
+  title,
+}: {
+  index: string
+  title: string
+}) {
+  return (
+    <div className="mb-3 flex items-center gap-3">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
+        {index}
+      </div>
+      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+        {title}
+      </h3>
+    </div>
+  )
+}
+
+function TextareaField({
   value,
   onChange,
   placeholder,
-  minRows = 3,
+  minRows = 4,
 }: {
   value: string
-  onChange: (v: string) => void
+  onChange: (value: string) => void
   placeholder?: string
   minRows?: number
 }) {
@@ -65,39 +84,8 @@ function AutoTextarea({
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       rows={minRows}
-      className="w-full resize-none rounded-2xl border border-[#e7dccd] bg-[#fffdfa] px-4 py-3 text-[15px] leading-7 text-slate-800 outline-none transition focus:border-[#d6b792] focus:ring-4 focus:ring-[#f4e3cc] print:border-none print:bg-transparent print:px-0 print:py-0"
+      className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] leading-7 text-slate-800 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100 dark:focus:bg-slate-800"
     />
-  )
-}
-
-function SectionCard({
-  index,
-  title,
-  subtitle,
-  children,
-}: {
-  index: string
-  title: string
-  subtitle?: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="overflow-hidden rounded-[28px] border border-[#eadfce] bg-white/95 shadow-[0_16px_50px_rgba(148,121,90,0.10)] print:rounded-none print:border print:shadow-none">
-      <div className="border-b border-[#f0e4d5] bg-[linear-gradient(135deg,#fff7ee_0%,#fffdf9_100%)] px-5 py-4 sm:px-7">
-        <div className="flex items-start gap-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#a66d3b] text-sm font-bold text-white">
-            {index}
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-[#51331c]">{title}</h3>
-            {subtitle && (
-              <p className="mt-1 text-sm text-[#9a7b5d]">{subtitle}</p>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="px-5 py-5 sm:px-7 sm:py-6">{children}</div>
-    </section>
   )
 }
 
@@ -107,7 +95,6 @@ export default function WorkLogPage() {
   const [log, setLog] = useState<WorkLog>(defaultLog(today))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
   const { storeId, storeName } = useStore()
 
   useEffect(() => {
@@ -170,13 +157,12 @@ export default function WorkLogPage() {
 
   const updateField = <K extends keyof WorkLog>(key: K, value: WorkLog[K]) => {
     setLog(prev => ({ ...prev, [key]: value }))
-    setSaved(false)
   }
 
-  const updateCustomerItem = (idx: number, value: string) => {
-    const items = [...log.customer_items]
-    items[idx] = value
-    updateField('customer_items', items)
+  const updateCustomerItem = (index: number, value: string) => {
+    const next = [...log.customer_items]
+    next[index] = value
+    updateField('customer_items', next)
   }
 
   const handleSave = async () => {
@@ -214,54 +200,28 @@ export default function WorkLogPage() {
     }
 
     setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 1800)
   }
 
-  const statusText = saved
-    ? '저장 완료'
-    : saving
-      ? '저장 중...'
-      : '작성 중'
-
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f6efe6_0%,#f9f6f1_22%,#fbfaf8_100%)] text-slate-900">
-      <style>{`
-        @media print {
-          .no-print { display: none !important; }
-          body { background: white !important; color: black !important; }
-          textarea, input[type="text"], input[type="date"] {
-            border: none !important;
-            background: transparent !important;
-            box-shadow: none !important;
-            color: black !important;
-          }
-        }
-      `}</style>
-
-      <header className="no-print sticky top-0 z-20 border-b border-[#eadcc8] bg-[rgba(251,247,241,0.92)] backdrop-blur-xl">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#0f1117] text-slate-900 dark:text-slate-100">
+      <header className="sticky top-0 z-20 border-b border-slate-200 dark:border-slate-700/60 bg-white dark:bg-[#161b27]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Link
             href="/"
-            className="inline-flex items-center rounded-full border border-[#e6d3bb] bg-white px-3 py-1.5 text-sm font-medium text-[#6f4a29] transition hover:border-[#d5b18a] hover:bg-[#fff7ee]"
+            className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700/60 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             홈으로
           </Link>
 
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#b99169]">
-              Work Log
-            </p>
-            <h1 className="text-lg font-semibold text-[#4c301a] sm:text-xl">
-              근무일지
-            </h1>
-          </div>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">
+            근무일지
+          </h1>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-1 rounded-full border border-[#ead7c0] bg-white px-1 py-1 shadow-sm">
+            <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1 py-1 shadow-sm dark:border-slate-700/60 dark:bg-slate-800/60">
               <button
                 onClick={() => changeDate(-1)}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[#835634] transition hover:bg-[#f9efe2]"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 ‹
               </button>
@@ -269,11 +229,11 @@ export default function WorkLogPage() {
                 type="date"
                 value={dateStr}
                 onChange={e => setDateStr(e.target.value)}
-                className="rounded-full border border-[#efe2d2] bg-[#fffdf9] px-3 py-2 text-sm text-[#5c3b22] outline-none focus:border-[#d5b18a]"
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               />
               <button
                 onClick={() => changeDate(1)}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[#835634] transition hover:bg-[#f9efe2]"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 ›
               </button>
@@ -282,23 +242,16 @@ export default function WorkLogPage() {
             {dateStr !== today && (
               <button
                 onClick={() => setDateStr(today)}
-                className="rounded-full border border-[#ead7c0] bg-white px-3 py-2 text-sm font-medium text-[#7a5230] transition hover:bg-[#fff6eb]"
+                className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 오늘
               </button>
             )}
 
             <button
-              onClick={() => window.print()}
-              className="rounded-full border border-[#ead7c0] bg-white px-3 py-2 text-sm font-medium text-[#7a5230] transition hover:bg-[#fff6eb]"
-            >
-              인쇄
-            </button>
-
-            <button
               onClick={handleSave}
               disabled={saving}
-              className="rounded-full bg-[#9b6336] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(155,99,54,0.22)] transition hover:bg-[#88532a] disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? '저장 중...' : '저장'}
             </button>
@@ -307,180 +260,132 @@ export default function WorkLogPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-        <section className="mb-6 overflow-hidden rounded-[30px] border border-[#e7dccd] bg-[linear-gradient(135deg,#fff9f2_0%,#fffefc_100%)] shadow-[0_24px_60px_rgba(126,96,63,0.10)]">
-          <div className="grid gap-5 px-5 py-6 sm:grid-cols-[1.3fr_0.7fr] sm:px-8 sm:py-7">
-            <div>
-              <p className="text-sm font-medium text-[#b28a64]">Daily Record</p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[#4a2f1b] sm:text-3xl">
-                {storeName ? `${storeName} 근무일지` : '근무일지'}
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-[#86684c]">
-                운영 메모, 고객 전달사항, 다음 날 계획까지 한 장에서 정리할 수 있도록 밝고 읽기 쉬운 서식으로 다듬었습니다.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:justify-items-end">
-              <div className="rounded-2xl border border-[#eadbc8] bg-white px-4 py-3 text-right shadow-sm">
-                <p className="text-xs uppercase tracking-[0.2em] text-[#b08a67]">
-                  Date
-                </p>
-                <p className="mt-1 text-lg font-semibold text-[#57361e]">
-                  {formatDisplayDate(dateStr)}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-[#eadbc8] bg-white px-4 py-3 text-right shadow-sm">
-                <p className="text-xs uppercase tracking-[0.2em] text-[#b08a67]">
-                  Status
-                </p>
-                <p className="mt-1 text-sm font-semibold text-[#57361e]">
-                  {statusText}
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {loading ? (
-          <div className="grid gap-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-40 animate-pulse rounded-[28px] border border-[#eee2d3] bg-white/80"
-              />
-            ))}
+          <div className="rounded-[28px] border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm dark:border-slate-700/50 dark:bg-[#161b27] dark:text-slate-400">
+            불러오는 중...
           </div>
         ) : (
-          <div className="grid gap-5">
-            <SectionCard
-              index="01"
-              title="매장 위생 및 청결 상태"
-              subtitle="청소 완료 여부, 소모품 보충, 점검 사항을 간단히 남겨주세요."
-            >
-              <AutoTextarea
-                value={log.hygiene}
-                onChange={v => updateField('hygiene', v)}
-                placeholder="예: 오픈 전 청소 완료, 수건/가운 보충, 샤워실 점검 이상 없음"
-                minRows={4}
-              />
-            </SectionCard>
-
-            <SectionCard
-              index="02"
-              title="관리사 특이사항"
-              subtitle="출근 상태, 컨디션, 일정 조정, 전달이 필요한 이슈를 적어주세요."
-            >
-              <AutoTextarea
-                value={log.therapist_notes}
-                onChange={v => updateField('therapist_notes', v)}
-                placeholder={'1.\n2.\n3.'}
-                minRows={5}
-              />
-            </SectionCard>
-
-            <SectionCard
-              index="03"
-              title="고객 특이사항"
-              subtitle="고객별 메모와 오버, 인수인계 내용을 한 번에 정리합니다."
-            >
-              <div className="grid gap-3">
-                {log.customer_items.map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 rounded-2xl border border-[#efe3d4] bg-[#fffdfa] px-4 py-3"
-                  >
-                    <span className="w-7 shrink-0 text-right text-sm font-semibold text-[#b58b63]">
-                      {i + 1}.
-                    </span>
-                    <input
-                      type="text"
-                      value={item}
-                      onChange={e => updateCustomerItem(i, e.target.value)}
-                      className="w-full bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-300"
-                      placeholder="고객 메모를 입력하세요"
-                    />
-                  </div>
-                ))}
+          <div className="rounded-[32px] border border-slate-200 bg-white shadow-sm dark:border-slate-700/50 dark:bg-[#161b27]">
+            <div className="border-b border-slate-200 px-6 py-6 sm:px-8 dark:border-slate-700/50">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                    {formatDisplayDate(dateStr)}
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
+                    {storeName ? `${storeName} 근무일지` : '근무일지'}
+                  </h2>
+                </div>
               </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                {[
-                  { label: '오버 고객', key: 'customer_over' as const },
-                  { label: '타점 인계', key: 'customer_handoff' as const },
-                  { label: '타점 인수', key: 'customer_receive' as const },
-                ].map(({ label, key }) => (
-                  <label
-                    key={key}
-                    className="rounded-2xl border border-[#efe3d4] bg-[#fffdfa] px-4 py-3"
-                  >
-                    <span className="mb-2 block text-sm font-semibold text-[#876345]">
-                      {label}
-                    </span>
-                    <input
-                      type="text"
-                      value={log[key]}
-                      onChange={e => updateField(key, e.target.value)}
-                      className="w-full bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-300"
-                      placeholder={`${label} 내용을 입력하세요`}
-                    />
-                  </label>
-                ))}
-              </div>
-            </SectionCard>
-
-            <div className="grid gap-5 lg:grid-cols-2">
-              <SectionCard
-                index="04"
-                title="관리자 특이사항"
-                subtitle="운영 이슈, 체크 포인트, 다음 근무자를 위한 메모"
-              >
-                <AutoTextarea
-                  value={log.manager_notes}
-                  onChange={v => updateField('manager_notes', v)}
-                  placeholder={'1.\n2.\n3.'}
-                  minRows={6}
-                />
-              </SectionCard>
-
-              <SectionCard
-                index="05"
-                title="기타 보고사항"
-                subtitle="따로 분리해서 남길 내용이 있으면 적어주세요."
-              >
-                <AutoTextarea
-                  value={log.other_notes}
-                  onChange={v => updateField('other_notes', v)}
-                  placeholder="기타 보고사항"
-                  minRows={6}
-                />
-              </SectionCard>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-2">
-              <SectionCard
-                index="06"
-                title="메모"
-                subtitle="짧은 운영 메모나 참고사항을 자유롭게 남깁니다."
-              >
-                <AutoTextarea
-                  value={log.memo}
-                  onChange={v => updateField('memo', v)}
-                  placeholder="공용 메모"
-                  minRows={5}
+            <div className="space-y-8 px-6 py-6 sm:px-8 sm:py-8">
+              <section>
+                <SectionTitle index="01" title="매장 위생 및 청결 상태" />
+                <TextareaField
+                  value={log.hygiene}
+                  onChange={value => updateField('hygiene', value)}
+                  placeholder="청소, 정리, 소모품 상태 등을 기록하세요."
+                  minRows={4}
                 />
-              </SectionCard>
+              </section>
 
-              <SectionCard
-                index="07"
-                title="내일 계획"
-                subtitle="예약, 인력, 준비물, 확인할 사항을 정리해두세요."
-              >
-                <AutoTextarea
-                  value={log.tomorrow_plans}
-                  onChange={v => updateField('tomorrow_plans', v)}
-                  placeholder={'예: 오전 예약 확인\n세탁물 수량 체크\n신규 고객 응대 메모'}
+              <section>
+                <SectionTitle index="02" title="관리사 특이사항" />
+                <TextareaField
+                  value={log.therapist_notes}
+                  onChange={value => updateField('therapist_notes', value)}
+                  placeholder="관리사 관련 내용을 기록하세요."
                   minRows={5}
                 />
-              </SectionCard>
+              </section>
+
+              <section>
+                <SectionTitle index="03" title="고객 특이사항" />
+                <div className="grid gap-3">
+                  {log.customer_items.map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70"
+                    >
+                      <span className="w-7 shrink-0 text-right text-sm font-semibold text-slate-400 dark:text-slate-500">
+                        {index + 1}.
+                      </span>
+                      <input
+                        type="text"
+                        value={item}
+                        onChange={e => updateCustomerItem(index, e.target.value)}
+                        className="w-full bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-300 dark:text-slate-100 dark:placeholder:text-slate-500"
+                        placeholder="고객 메모를 입력하세요"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  {[
+                    { key: 'customer_over' as const, label: '오버 고객' },
+                    { key: 'customer_handoff' as const, label: '타점 인계' },
+                    { key: 'customer_receive' as const, label: '타점 인수' },
+                  ].map(item => (
+                    <label
+                      key={item.key}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70"
+                    >
+                      <span className="mb-2 block text-sm font-semibold text-slate-600 dark:text-slate-300">
+                        {item.label}
+                      </span>
+                      <input
+                        type="text"
+                        value={log[item.key]}
+                        onChange={e => updateField(item.key, e.target.value)}
+                        className="w-full bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-300 dark:text-slate-100 dark:placeholder:text-slate-500"
+                        placeholder={`${item.label} 입력`}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <SectionTitle index="04" title="관리자 특이사항" />
+                <TextareaField
+                  value={log.manager_notes}
+                  onChange={value => updateField('manager_notes', value)}
+                  placeholder="관리자 확인 사항을 기록하세요."
+                  minRows={5}
+                />
+              </section>
+
+              <section>
+                <SectionTitle index="05" title="기타 보고사항" />
+                <TextareaField
+                  value={log.other_notes}
+                  onChange={value => updateField('other_notes', value)}
+                  placeholder="기타 보고사항을 기록하세요."
+                  minRows={4}
+                />
+              </section>
+
+              <section>
+                <SectionTitle index="06" title="메모" />
+                <TextareaField
+                  value={log.memo}
+                  onChange={value => updateField('memo', value)}
+                  placeholder="공용 메모를 남겨주세요."
+                  minRows={4}
+                />
+              </section>
+
+              <section>
+                <SectionTitle index="07" title="내일 계획" />
+                <TextareaField
+                  value={log.tomorrow_plans}
+                  onChange={value => updateField('tomorrow_plans', value)}
+                  placeholder="다음 날 계획을 기록하세요."
+                  minRows={4}
+                />
+              </section>
             </div>
           </div>
         )}
