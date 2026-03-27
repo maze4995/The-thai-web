@@ -12,6 +12,9 @@ import { useStore } from './StoreProvider'
 
 const MAX_SLOTS = 5
 
+// Module-level dedup: persists across React Strict Mode remounts
+const processedReservationIds = new Set<string>()
+
 interface Props {
   initialTherapists: Therapist[]
   initialAttendance: DailyAttendance[]
@@ -68,8 +71,6 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   useEffect(() => { dateRef.current = date }, [date])
   useEffect(() => { storeIdRef.current = storeId }, [storeId])
 
-  // Track processed reservation IDs to prevent duplicates
-  const processedReservations = useRef(new Set<string>())
   // Lock to prevent concurrent auto-assign
   const assigningLock = useRef(false)
 
@@ -79,9 +80,9 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
 
   // Auto-assign reservation to the therapist with fewest slots (by display_order)
   const autoAssignReservation = async (reservation: Reservation) => {
-    // Prevent duplicate processing
-    if (processedReservations.current.has(reservation.id)) return
-    processedReservations.current.add(reservation.id)
+    // Prevent duplicate processing (module-level Set survives remounts)
+    if (processedReservationIds.has(reservation.id)) return
+    processedReservationIds.add(reservation.id)
 
     // Wait for any ongoing assignment to finish
     while (assigningLock.current) {
