@@ -1,7 +1,7 @@
 'use client'
 
 import { ScheduleSlot, TherapistWithSlots } from '@/lib/types'
-import { formatPrice, getServiceCommission, getCustomerType } from '@/lib/utils'
+import { formatPrice, getServiceCommission, getCustomerType, parseMixedEntries } from '@/lib/utils'
 
 interface Props {
   slots: ScheduleSlot[]
@@ -15,9 +15,23 @@ export function SummaryFooter({ slots, therapists }: Props) {
   // Revenue: exclude pure CM (without 스페셜). 스페셜+CM → included in revenue
   const revenueSlots = slots.filter(s => !isCoupon(s) || isSpecial(s))
   const total = revenueSlots.reduce((s, slot) => s + slot.service_price, 0)
-  const cash = revenueSlots.filter(s => s.payment_type === 'cash').reduce((s, slot) => s + slot.service_price, 0)
-  const card = revenueSlots.filter(s => s.payment_type === 'card').reduce((s, slot) => s + slot.service_price, 0)
-  const transfer = revenueSlots.filter(s => s.payment_type === 'transfer').reduce((s, slot) => s + slot.service_price, 0)
+  const getMixedAmount = (slot: ScheduleSlot, label: string) =>
+    parseMixedEntries(slot.memo ?? '').find(e => e.label === label)?.amount ?? 0
+  const cash = revenueSlots.reduce((s, slot) => {
+    if (slot.payment_type === 'cash') return s + slot.service_price
+    if (slot.payment_type === 'mixed') return s + getMixedAmount(slot, '현금')
+    return s
+  }, 0)
+  const card = revenueSlots.reduce((s, slot) => {
+    if (slot.payment_type === 'card') return s + slot.service_price
+    if (slot.payment_type === 'mixed') return s + getMixedAmount(slot, '카드')
+    return s
+  }, 0)
+  const transfer = revenueSlots.reduce((s, slot) => {
+    if (slot.payment_type === 'transfer') return s + slot.service_price
+    if (slot.payment_type === 'mixed') return s + getMixedAmount(slot, '이체')
+    return s
+  }, 0)
   const couponCount = slots.filter(s => isCoupon(s)).length
   const totalCustomers = slots.length
 
