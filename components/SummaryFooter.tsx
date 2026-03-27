@@ -12,11 +12,17 @@ export function SummaryFooter({ slots, therapists }: Props) {
   // 스페셜 and CM can coexist on same slot
   const isSpecial = (s: ScheduleSlot) => s.memo?.includes('스페셜')
   const isCoupon = (s: ScheduleSlot) => /cm/i.test(s.memo ?? '')
-  // Revenue: exclude pure CM (without 스페셜). 스페셜+CM → included in revenue
-  const revenueSlots = slots.filter(s => !isCoupon(s) || isSpecial(s))
-  const total = revenueSlots.reduce((s, slot) => s + slot.service_price, 0)
+  // Revenue: exclude pure CM (without 스페셜). 스페셜+CM → included. mixed → always included.
   const getMixedAmount = (slot: ScheduleSlot, label: string) =>
     parseMixedEntries(slot.memo ?? '').find(e => e.label === label)?.amount ?? 0
+  const revenueSlots = slots.filter(s => {
+    if (s.payment_type === 'mixed') return true
+    return !isCoupon(s) || isSpecial(s)
+  })
+  const total = revenueSlots.reduce((s, slot) => {
+    if (slot.payment_type === 'mixed') return s + slot.service_price - getMixedAmount(slot, '쿠폰')
+    return s + slot.service_price
+  }, 0)
   const cash = revenueSlots.reduce((s, slot) => {
     if (slot.payment_type === 'cash') return s + slot.service_price
     if (slot.payment_type === 'mixed') return s + getMixedAmount(slot, '현금')
@@ -32,7 +38,7 @@ export function SummaryFooter({ slots, therapists }: Props) {
     if (slot.payment_type === 'mixed') return s + getMixedAmount(slot, '이체')
     return s
   }, 0)
-  const couponCount = slots.filter(s => isCoupon(s)).length
+  const couponCount = slots.filter(s => isCoupon(s) || (s.payment_type === 'mixed' && getMixedAmount(s, '쿠폰') > 0)).length
   const totalCustomers = slots.length
 
   // Customer type stats

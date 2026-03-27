@@ -424,13 +424,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
             >
               근무일지
             </a>
-            <a
-              href="/calendar"
-              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 transition-colors"
-            >
-              일정
-            </a>
-            <a
+<a
               href="/stats"
               className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 transition-colors"
             >

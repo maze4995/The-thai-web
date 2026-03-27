@@ -120,12 +120,17 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   // 문자할인: memo contains '문자할인'
   const isSmsDiscount = (s: ScheduleSlot) => s.memo?.includes('문자할인')
 
-  // Total revenue: exclude CM coupon, but INCLUDE 스페셜
-  // Revenue: exclude pure CM (without 스페셜). 스페셜+CM → included in revenue
-  const revenueSlots = slots.filter(s => !isCoupon(s) || isSpecial(s))
-  const totalRevenue = revenueSlots.reduce((sum, s) => sum + s.service_price, 0)
+  // Total revenue: exclude CM coupon, but INCLUDE 스페셜. mixed → always included.
   const getMixedAmount = (slot: ScheduleSlot, label: string) =>
     parseMixedEntries(slot.memo ?? '').find(e => e.label === label)?.amount ?? 0
+  const revenueSlots = slots.filter(s => {
+    if (s.payment_type === 'mixed') return true
+    return !isCoupon(s) || isSpecial(s)
+  })
+  const totalRevenue = revenueSlots.reduce((sum, s) => {
+    if (s.payment_type === 'mixed') return sum + s.service_price - getMixedAmount(s, '쿠폰')
+    return sum + s.service_price
+  }, 0)
 
   const cashTotal = revenueSlots.reduce((sum, s) => {
     if (s.payment_type === 'cash') return sum + s.service_price
@@ -142,7 +147,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
     if (s.payment_type === 'mixed') return sum + getMixedAmount(s, '이체')
     return sum
   }, 0)
-  const couponCount = slots.filter(s => isCoupon(s)).length
+  const couponCount = slots.filter(s => isCoupon(s) || (s.payment_type === 'mixed' && getMixedAmount(s, '쿠폰') > 0)).length
   const specialSlots = slots.filter(s => isSpecial(s))
   const specialCount = specialSlots.length
   const specialRevenue = specialSlots.reduce((sum, s) => sum + s.service_price, 0)
@@ -158,15 +163,18 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   // Daily breakdown
   const dailyData = periodDates.map((date, i) => {
     const daySlots = slots.filter(s => s.work_date === date)
-    const nonCoupon = daySlots.filter(s => !isCoupon(s) || isSpecial(s))
+    const nonCoupon = daySlots.filter(s => {
+      if (s.payment_type === 'mixed') return true
+      return !isCoupon(s) || isSpecial(s)
+    })
     return {
       date,
       label: viewMode === 'week' ? DAY_LABELS[i] : getDayLabel(date),
-      total: nonCoupon.reduce((sum, s) => sum + s.service_price, 0),
+      total: nonCoupon.reduce((sum, s) => s.payment_type === 'mixed' ? sum + s.service_price - getMixedAmount(s, '쿠폰') : sum + s.service_price, 0),
       cash: nonCoupon.reduce((sum, s) => s.payment_type === 'cash' ? sum + s.service_price : s.payment_type === 'mixed' ? sum + getMixedAmount(s, '현금') : sum, 0),
       card: nonCoupon.reduce((sum, s) => s.payment_type === 'card' ? sum + s.service_price : s.payment_type === 'mixed' ? sum + getMixedAmount(s, '카드') : sum, 0),
       transfer: nonCoupon.reduce((sum, s) => s.payment_type === 'transfer' ? sum + s.service_price : s.payment_type === 'mixed' ? sum + getMixedAmount(s, '이체') : sum, 0),
-      coupon: daySlots.filter(s => isCoupon(s)).length,
+      coupon: daySlots.filter(s => isCoupon(s) || (s.payment_type === 'mixed' && getMixedAmount(s, '쿠폰') > 0)).length,
       special: daySlots.filter(s => isSpecial(s)).length,
       customers: daySlots.length,
     }
