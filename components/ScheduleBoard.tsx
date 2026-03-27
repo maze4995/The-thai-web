@@ -10,7 +10,7 @@ import { formatDate, toDateString, getBusinessDate, mapServiceName, getServicePr
 import { useTheme } from './ThemeProvider'
 import { useStore } from './StoreProvider'
 
-const MAX_SLOTS = 5
+const MAX_SLOTS = 7
 
 // Module-level dedup: persists across React Strict Mode remounts
 const processedReservationIds = new Set<string>()
