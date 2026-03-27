@@ -36,15 +36,35 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const { storeId, storeName, signOut } = useStore()
 
   const fetchData = useCallback(async (workDate: string) => {
+    if (!storeId) {
+      setAttendance([])
+      setSlots([])
+      setManager('')
+      return
+    }
+
     const [attendanceRes, slotsRes, managerRes] = await Promise.all([
-      supabase.from('daily_attendance').select('*').eq('work_date', workDate),
-      supabase.from('schedule_slots').select('*').eq('work_date', workDate),
-      supabase.from('daily_settings').select('manager').eq('work_date', workDate).single(),
+      supabase
+        .from('daily_attendance')
+        .select('*')
+        .eq('store_id', storeId)
+        .eq('work_date', workDate),
+      supabase
+        .from('schedule_slots')
+        .select('*')
+        .eq('store_id', storeId)
+        .eq('work_date', workDate),
+      supabase
+        .from('daily_settings')
+        .select('manager')
+        .eq('store_id', storeId)
+        .eq('work_date', workDate)
+        .single(),
     ])
     setAttendance(attendanceRes.data ?? [])
     setSlots(slotsRes.data ?? [])
     setManager(managerRes.data?.manager ?? '')
-  }, [])
+  }, [storeId])
 
   // On mount, always reset to today's business date
   useEffect(() => {
@@ -56,8 +76,9 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   }, [])
 
   useEffect(() => {
+    if (!storeId) return
     fetchData(date)
-  }, [date, fetchData])
+  }, [date, fetchData, storeId])
 
   // Keep refs in sync for use in realtime callback
   const therapistsRef = useRef(therapists)
@@ -92,6 +113,9 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
 
     try {
       const currentDate = dateRef.current
+      const currentStoreId = storeIdRef.current
+      if (!currentStoreId) return
+      if (reservation.store_id && reservation.store_id !== currentStoreId) return
       console.log('[AutoAssign] 시작:', { id: reservation.id, date: reservation.reserved_date, time: reservation.reserved_time, status: reservation.status, currentDate })
       if (!isReservationInBusinessDay(reservation.reserved_date, reservation.reserved_time, currentDate)) { console.log('[AutoAssign] 스킵: 날짜 불일치'); return }
       if (reservation.status && reservation.status !== '예약확정') { console.log('[AutoAssign] 스킵: status =', reservation.status); return }
@@ -100,6 +124,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       const { data: existing } = await supabase
         .from('schedule_slots')
         .select('id')
+        .eq('store_id', currentStoreId)
         .eq('reservation_id', reservation.id)
         .limit(1)
       if (existing && existing.length > 0) return
@@ -146,7 +171,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         .reduce((max, s) => Math.max(max, s.slot_order ?? 0), 0)
 
       await supabase.from('schedule_slots').insert({
-        store_id: storeIdRef.current,
+        store_id: currentStoreId,
         therapist_id: assignTo.id,
         therapist_name: assignTo.name,
         work_date: currentDate,
@@ -170,15 +195,16 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
 
   // Realtime subscriptions - runs once on mount, uses refs for current values
   useEffect(() => {
+    if (!storeId) return
     const channel = supabase
-      .channel('schedule-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_slots' }, () => {
+      .channel(`schedule-realtime-${storeId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_slots', filter: `store_id=eq.${storeId}` }, () => {
         fetchDataRef.current(dateRef.current)
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_attendance' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_attendance', filter: `store_id=eq.${storeId}` }, () => {
         fetchDataRef.current(dateRef.current)
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reservations' }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reservations', filter: `store_id=eq.${storeId}` }, (payload) => {
         console.log('[Realtime] reservation INSERT 수신:', payload.new)
         autoAssignReservation(payload.new as Reservation)
       })
@@ -188,7 +214,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       supabase.removeChannel(channel)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [storeId])
 
   const navigateDate = (delta: number) => {
     const d = new Date(date + 'T00:00:00')

@@ -10,6 +10,7 @@ export interface Therapist {
 
 export interface DailyAttendance {
   id: string
+  store_id?: string
   therapist_id: string
   work_date: string
   is_present: boolean
@@ -18,6 +19,7 @@ export interface DailyAttendance {
 
 export interface ScheduleSlot {
   id: string
+  store_id?: string
   reservation_id: string | null
   therapist_id: string
   therapist_name: string | null
@@ -37,6 +39,7 @@ export interface ScheduleSlot {
 
 export interface Reservation {
   id: string
+  store_id?: string
   customer_name: string
   customer_phone: string
   reserved_date: string

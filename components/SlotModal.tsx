@@ -60,6 +60,12 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
 
   useEffect(() => {
     const fetchReservations = async () => {
+      if (!storeId) {
+        setReservations([])
+        setLoadingRes(false)
+        return
+      }
+
       setLoadingRes(true)
       // Fetch both workDate and next day, then filter client-side using isReservationInBusinessDay
       const nextDay = new Date(workDate + 'T00:00:00')
@@ -68,10 +74,12 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
 
       const [sameDayRes, nextDayRes] = await Promise.all([
         supabase.from('reservations').select('*')
+          .eq('store_id', storeId)
           .eq('reserved_date', workDate)
           .eq('status', '예약확정')
           .order('reserved_time'),
         supabase.from('reservations').select('*')
+          .eq('store_id', storeId)
           .eq('reserved_date', nextDayStr)
           .eq('status', '예약확정')
           .order('reserved_time'),
@@ -81,7 +89,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
       setLoadingRes(false)
     }
     fetchReservations()
-  }, [workDate])
+  }, [storeId, workDate])
 
   // Auto-calculate check-out when check-in or service changes
   useEffect(() => {
