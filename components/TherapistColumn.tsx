@@ -115,7 +115,7 @@ export function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, on
         <div className="flex items-center gap-1 sm:gap-1.5">
           <span className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">{therapist.name}</span>
           {isServing && (
-            <span className="text-[9px] sm:text-[10px] font-bold tracking-wider bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 px-1 sm:px-1.5 py-0.5 rounded animate-pulse">
+            <span className="text-[9px] sm:text-[10px] font-bold tracking-wider bg-red-500 text-white px-1 sm:px-1.5 py-0.5 rounded animate-pulse">
               관리중
             </span>
           )}

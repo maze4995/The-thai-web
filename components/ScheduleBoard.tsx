@@ -494,7 +494,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         ) : (
           <div
             className="grid gap-2 sm:gap-3 h-full"
-            style={{ gridTemplateColumns: `repeat(${presentTherapists.length}, minmax(160px, 1fr))` }}
+            style={{ gridTemplateColumns: `repeat(5, minmax(160px, 1fr))` }}
           >
             {presentTherapists.map(therapist => (
               <TherapistColumn
@@ -506,6 +506,12 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
                 onDropSlot={handleDropSlot}
                 onSwapSlots={handleSwapSlots}
                 onDropColumn={handleDropColumn}
+              />
+            ))}
+            {Array.from({ length: Math.max(0, 5 - presentTherapists.length) }).map((_, i) => (
+              <div
+                key={`empty-col-${i}`}
+                className="flex flex-col bg-white/40 dark:bg-[#161b27]/40 border border-dashed border-slate-200 dark:border-slate-700/30 rounded-xl"
               />
             ))}
           </div>

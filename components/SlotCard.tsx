@@ -122,6 +122,8 @@ export function SlotCard({ slot, workDate, onClick, onSwapSlot }: Props) {
       className={`w-full text-left rounded-lg p-1.5 sm:p-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing group border ${
         dropOver
           ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-500 ring-1 ring-amber-400/50'
+          : isFinished
+          ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700/50 hover:bg-yellow-100 dark:hover:bg-yellow-900/30'
           : 'bg-slate-50 dark:bg-[#1e2535] hover:bg-slate-100 dark:hover:bg-[#252d40] border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-500'
       }`}
     >
