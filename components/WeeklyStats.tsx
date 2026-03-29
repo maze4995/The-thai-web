@@ -152,11 +152,13 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   const specialCount = specialSlots.length
   const specialRevenue = specialSlots.reduce((sum, s) => sum + s.service_price, 0)
   const smsDiscountSlots = slots.filter(s => isSmsDiscount(s))
-  // 신규 고객: 순수 신규 + 신규로드(연락처 010-XXXX-XXXX 형식만)
+  // 빈 전화번호 → 신규로드
+  const resolveType = (s: ScheduleSlot) => !s.customer_phone ? '신규로드' : getCustomerType(s.customer_name)
+  // 신규 고객: 순수 신규 + 신규로드(연락처 010-XXXX-XXXX 형식만 또는 전화번호 없음)
   const phonePattern = /^010-\d{4}-\d{4}$/
   const newAllSlots = [
-    ...slots.filter(s => getCustomerType(s.customer_name) === '신규'),
-    ...slots.filter(s => getCustomerType(s.customer_name) === '신규로드' && phonePattern.test(s.customer_phone ?? '')),
+    ...slots.filter(s => resolveType(s) === '신규'),
+    ...slots.filter(s => resolveType(s) === '신규로드' && (!s.customer_phone || phonePattern.test(s.customer_phone))),
   ]
   const totalCustomers = slots.length
 

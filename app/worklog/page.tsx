@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useStore } from '@/components/StoreProvider'
 import { getBusinessDate } from '@/lib/utils'
@@ -96,7 +96,10 @@ export default function WorkLogPage() {
   const [log, setLog] = useState<WorkLog>(defaultLog(today))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [autoSaved, setAutoSaved] = useState(false)
   const { storeId, storeName } = useStore()
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isFirstLoad = useRef(true)
 
   useEffect(() => {
     let active = true
@@ -140,6 +143,7 @@ export default function WorkLogPage() {
         setLog(defaultLog(dateStr))
       }
 
+      isFirstLoad.current = true
       setLoading(false)
     }
 
@@ -149,6 +153,51 @@ export default function WorkLogPage() {
       active = false
     }
   }, [dateStr, storeId])
+
+  // Auto-save: debounce 2s after any log change (skip initial load)
+  useEffect(() => {
+    if (loading) return
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false
+      return
+    }
+    if (!storeId) return
+
+    setAutoSaved(false)
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(async () => {
+      const payload = {
+        store_id: storeId,
+        log_date: dateStr,
+        hygiene: log.hygiene,
+        therapist_notes: log.therapist_notes,
+        customer_items: log.customer_items,
+        customer_over: log.customer_over,
+        customer_handoff: log.customer_handoff,
+        customer_receive: log.customer_receive,
+        manager_notes: log.manager_notes,
+        other_notes: log.other_notes,
+        memo: log.memo,
+        tomorrow_plans: log.tomorrow_plans,
+        updated_at: new Date().toISOString(),
+      }
+      const { data } = await supabase
+        .from('work_logs')
+        .upsert(payload, { onConflict: 'store_id,log_date' })
+        .select('id')
+        .single()
+      if (data) {
+        setLog(prev => ({ ...prev, id: data.id }))
+        setAutoSaved(true)
+        setTimeout(() => setAutoSaved(false), 2000)
+      }
+    }, 2000)
+
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [log])
 
   const changeDate = (delta: number) => {
     const d = new Date(dateStr)
@@ -243,6 +292,9 @@ export default function WorkLogPage() {
               </button>
             )}
 
+            {autoSaved && (
+              <span className="text-xs text-emerald-500 font-medium">자동저장됨</span>
+            )}
             <button
               onClick={handleSave}
               disabled={saving}

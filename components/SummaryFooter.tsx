@@ -41,10 +41,11 @@ export function SummaryFooter({ slots, therapists }: Props) {
   const couponCount = slots.filter(s => isCoupon(s) || (s.payment_type === 'mixed' && getMixedAmount(s, '쿠폰') > 0)).length
   const totalCustomers = slots.length
 
-  // Customer type stats
-  const newRoadCount = slots.filter(s => getCustomerType(s.customer_name) === '신규로드').length
-  const existingRoadCount = slots.filter(s => getCustomerType(s.customer_name) === '기존로드').length
-  const newCustomerCount = slots.filter(s => getCustomerType(s.customer_name) === '신규').length
+  // Customer type stats (empty phone → 신규로드)
+  const resolveType = (s: ScheduleSlot) => !s.customer_phone ? '신규로드' : getCustomerType(s.customer_name)
+  const newRoadCount = slots.filter(s => resolveType(s) === '신규로드').length
+  const existingRoadCount = slots.filter(s => resolveType(s) === '기존로드').length
+  const newCustomerCount = slots.filter(s => resolveType(s) === '신규').length
 
   // Commission: fixed amount per service type
   const commissions = therapists.map(t => {
