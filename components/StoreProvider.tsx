@@ -53,7 +53,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setStoreId(null)
         setStoreName(null)
         setUserEmail(null)
-      } else if (event === 'SIGNED_IN') {
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         loadStore()
       }
     })

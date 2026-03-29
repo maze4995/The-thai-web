@@ -23,8 +23,9 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // 세션 갱신 (토큰 만료 방지)
-  const { data: { user } } = await supabase.auth.getUser()
+  // 세션 갱신 (쿠키에서 로컬 읽기 — 네트워크 실패로 로그아웃되는 현상 방지)
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user ?? null
 
   const isLoginPage = request.nextUrl.pathname === '/login'
 
