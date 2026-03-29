@@ -154,7 +154,7 @@ export default function WorkLogPage() {
     }
   }, [dateStr, storeId])
 
-  // Auto-save: debounce 2s after any log change (skip initial load)
+  // Auto-save: 300ms debounce (Notion-style — feels instant)
   useEffect(() => {
     if (loading) return
     if (isFirstLoad.current) {
@@ -189,9 +189,9 @@ export default function WorkLogPage() {
       if (data) {
         setLog(prev => ({ ...prev, id: data.id }))
         setAutoSaved(true)
-        setTimeout(() => setAutoSaved(false), 2000)
+        setTimeout(() => setAutoSaved(false), 1500)
       }
-    }, 2000)
+    }, 300)
 
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
