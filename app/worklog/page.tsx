@@ -19,6 +19,7 @@ interface WorkLog {
   other_notes: string
   memo: string
   tomorrow_plans: string
+  program_feedback: string
 }
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토']
@@ -46,6 +47,7 @@ function defaultLog(date: string): WorkLog {
     other_notes: '',
     memo: '',
     tomorrow_plans: '',
+    program_feedback: '',
   }
 }
 
@@ -139,6 +141,7 @@ export default function WorkLogPage() {
           other_notes: data.other_notes ?? '',
           memo: data.memo ?? '',
           tomorrow_plans: data.tomorrow_plans ?? '',
+          program_feedback: data.program_feedback ?? '',
         })
       } else {
         setLog(defaultLog(dateStr))
@@ -191,6 +194,7 @@ export default function WorkLogPage() {
         other_notes: log.other_notes,
         memo: log.memo,
         tomorrow_plans: log.tomorrow_plans,
+        program_feedback: log.program_feedback,
         updated_at: new Date().toISOString(),
       }
       const { data } = await supabase
@@ -451,6 +455,16 @@ export default function WorkLogPage() {
                   value={log.tomorrow_plans}
                   onChange={value => updateField('tomorrow_plans', value)}
                   placeholder="다음 날 계획을 기록하세요."
+                  minRows={4}
+                />
+              </section>
+
+              <section>
+                <SectionTitle index="08" title="프로그램 건의사항" />
+                <TextareaField
+                  value={log.program_feedback}
+                  onChange={value => updateField('program_feedback', value)}
+                  placeholder="프로그램 사용 중 불편한 점, 개선 요청, 버그 등을 자유롭게 작성해주세요."
                   minRows={4}
                 />
               </section>
