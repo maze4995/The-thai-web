@@ -353,16 +353,25 @@ export default function WorkLogPage() {
                   {log.customer_items.map((item, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70"
+                      className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70"
                     >
-                      <span className="w-7 shrink-0 text-right text-sm font-semibold text-slate-400 dark:text-slate-500">
+                      <span className="w-7 shrink-0 text-right text-sm font-semibold text-slate-400 dark:text-slate-500 pt-0.5">
                         {index + 1}.
                       </span>
-                      <input
-                        type="text"
+                      <textarea
                         value={item}
-                        onChange={e => updateCustomerItem(index, e.target.value)}
-                        className="w-full bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-300 dark:text-slate-100 dark:placeholder:text-slate-500"
+                        onChange={e => {
+                          updateCustomerItem(index, e.target.value)
+                          e.target.style.height = 'auto'
+                          e.target.style.height = e.target.scrollHeight + 'px'
+                        }}
+                        onInput={e => {
+                          const el = e.currentTarget
+                          el.style.height = 'auto'
+                          el.style.height = el.scrollHeight + 'px'
+                        }}
+                        rows={1}
+                        className="w-full bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-300 dark:text-slate-100 dark:placeholder:text-slate-500 resize-none overflow-hidden leading-7"
                         placeholder="고객 메모를 입력하세요"
                       />
                     </div>
