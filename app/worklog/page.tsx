@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useStore } from '@/components/StoreProvider'
+import { getBusinessDate } from '@/lib/utils'
 
 interface WorkLog {
   id?: string
@@ -90,7 +91,7 @@ function TextareaField({
 }
 
 export default function WorkLogPage() {
-  const today = toDateStr(new Date())
+  const today = getBusinessDate(new Date())
   const [dateStr, setDateStr] = useState(today)
   const [log, setLog] = useState<WorkLog>(defaultLog(today))
   const [loading, setLoading] = useState(true)
@@ -185,19 +186,13 @@ export default function WorkLogPage() {
       updated_at: new Date().toISOString(),
     }
 
-    if (log.id) {
-      await supabase.from('work_logs').update(payload).eq('id', log.id)
-    } else {
-      const { data } = await supabase
-        .from('work_logs')
-        .insert(payload)
-        .select()
-        .single()
+    const { data } = await supabase
+      .from('work_logs')
+      .upsert(payload, { onConflict: 'store_id,log_date' })
+      .select('id')
+      .single()
 
-      if (data) {
-        setLog(prev => ({ ...prev, id: data.id }))
-      }
-    }
+    if (data) setLog(prev => ({ ...prev, id: data.id }))
 
     setSaving(false)
   }
