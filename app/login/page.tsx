@@ -1,15 +1,46 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+
+const STORAGE_EMAIL_KEY = 'login_saved_email'
+const STORAGE_REMEMBER_KEY = 'login_remember_email'
+const STORAGE_AUTO_KEY = 'login_auto_login'
 
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberEmail, setRememberEmail] = useState(false)
+  const [autoLogin, setAutoLogin] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checking, setChecking] = useState(true)
+
+  // Load saved preferences and check auto-login session
+  useEffect(() => {
+    const savedRemember = localStorage.getItem(STORAGE_REMEMBER_KEY) === 'true'
+    const savedAuto = localStorage.getItem(STORAGE_AUTO_KEY) === 'true'
+    setRememberEmail(savedRemember)
+    setAutoLogin(savedAuto)
+    if (savedRemember) {
+      setEmail(localStorage.getItem(STORAGE_EMAIL_KEY) ?? '')
+    }
+
+    // Auto-login: if preference is set and session exists, redirect
+    if (savedAuto) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          router.replace('/')
+        } else {
+          setChecking(false)
+        }
+      })
+    } else {
+      setChecking(false)
+    }
+  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,8 +55,25 @@ export default function LoginPage() {
       return
     }
 
+    // Save preferences
+    localStorage.setItem(STORAGE_REMEMBER_KEY, String(rememberEmail))
+    localStorage.setItem(STORAGE_AUTO_KEY, String(autoLogin))
+    if (rememberEmail) {
+      localStorage.setItem(STORAGE_EMAIL_KEY, email)
+    } else {
+      localStorage.removeItem(STORAGE_EMAIL_KEY)
+    }
+
     router.push('/')
     router.refresh()
+  }
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-slate-400 text-sm">자동 로그인 확인 중...</div>
+      </div>
+    )
   }
 
   return (
@@ -59,6 +107,27 @@ export default function LoginPage() {
               className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition-colors"
               placeholder="••••••••"
             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberEmail}
+                onChange={e => setRememberEmail(e.target.checked)}
+                className="w-4 h-4 rounded accent-emerald-500"
+              />
+              <span className="text-xs text-slate-400">아이디 저장</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={autoLogin}
+                onChange={e => setAutoLogin(e.target.checked)}
+                className="w-4 h-4 rounded accent-emerald-500"
+              />
+              <span className="text-xs text-slate-400">자동 로그인</span>
+            </label>
           </div>
 
           {error && (
