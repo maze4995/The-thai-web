@@ -100,6 +100,7 @@ export default function WorkLogPage() {
   const { storeId, storeName } = useStore()
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstLoad = useRef(true)
+  const customerItemsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let active = true
@@ -153,6 +154,17 @@ export default function WorkLogPage() {
       active = false
     }
   }, [dateStr, storeId])
+
+  // Recalculate textarea heights after log loads (content may be multi-line)
+  useEffect(() => {
+    if (loading) return
+    const el = customerItemsRef.current
+    if (!el) return
+    el.querySelectorAll('textarea').forEach(ta => {
+      ta.style.height = 'auto'
+      ta.style.height = ta.scrollHeight + 'px'
+    })
+  }, [loading, log.customer_items])
 
   // Auto-save: 300ms debounce (Notion-style — feels instant)
   useEffect(() => {
@@ -349,7 +361,7 @@ export default function WorkLogPage() {
 
               <section>
                 <SectionTitle index="03" title="고객 특이사항" />
-                <div className="grid gap-3">
+                <div ref={customerItemsRef} className="grid gap-3">
                   {log.customer_items.map((item, index) => (
                     <div
                       key={index}
