@@ -176,11 +176,16 @@ export function getServiceDuration(serviceName: string): number {
  * e.g. 2026-03-15 02:00 → business date is 2026-03-14
  */
 export function getBusinessDate(date: Date): string {
-  const adjusted = new Date(date)
-  if (adjusted.getHours() < 6) {
-    adjusted.setDate(adjusted.getDate() - 1)
+  // Always use KST (UTC+9) regardless of server timezone
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
+  const h = kst.getUTCHours()
+  if (h < 6) {
+    kst.setUTCDate(kst.getUTCDate() - 1)
   }
-  return toDateString(adjusted)
+  const y = kst.getUTCFullYear()
+  const m = String(kst.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(kst.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 /**

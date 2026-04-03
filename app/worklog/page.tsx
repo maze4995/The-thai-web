@@ -394,6 +394,14 @@ export default function WorkLogPage() {
                   ))}
                 </div>
 
+                <button
+                  type="button"
+                  onClick={() => updateField('customer_items', [...log.customer_items, ''])}
+                  className="mt-3 flex items-center gap-1.5 rounded-full border border-dashed border-slate-300 dark:border-slate-600 px-4 py-2 text-sm text-slate-400 dark:text-slate-500 hover:border-emerald-500 hover:text-emerald-500 transition-colors"
+                >
+                  + 항목 추가
+                </button>
+
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   {[
                     { key: 'customer_over' as const, label: '오버 고객' },
