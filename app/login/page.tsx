@@ -18,7 +18,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
 
-  // Load saved preferences and check auto-login session
   useEffect(() => {
     const savedRemember = localStorage.getItem(STORAGE_REMEMBER_KEY) === 'true'
     const savedAuto = localStorage.getItem(STORAGE_AUTO_KEY) === 'true'
@@ -28,7 +27,6 @@ export default function LoginPage() {
       setEmail(localStorage.getItem(STORAGE_EMAIL_KEY) ?? '')
     }
 
-    // Auto-login: if preference is set and session exists, redirect
     if (savedAuto) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
@@ -55,7 +53,6 @@ export default function LoginPage() {
       return
     }
 
-    // Save preferences
     localStorage.setItem(STORAGE_REMEMBER_KEY, String(rememberEmail))
     localStorage.setItem(STORAGE_AUTO_KEY, String(autoLogin))
     if (rememberEmail) {
@@ -70,79 +67,146 @@ export default function LoginPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-slate-400 text-sm">자동 로그인 확인 중...</div>
+      <div className="min-h-screen bg-[#111125] flex items-center justify-center">
+        <div className="text-slate-500 text-sm">자동 로그인 확인 중...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-[#161b27] border border-slate-700 rounded-2xl p-8 shadow-2xl">
-        <h1 className="text-xl font-bold text-emerald-400 text-center mb-1">조판지</h1>
-        <p className="text-xs text-slate-500 text-center mb-8">매장 관리 시스템</p>
+    <div className="min-h-screen bg-[#111125] flex flex-col items-center justify-center relative overflow-hidden">
+      {/* Background decorations */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-[#0c0c1f] via-transparent to-[#8b4513]/10 pointer-events-none" />
+      <div className="fixed top-20 -left-20 w-96 h-96 opacity-20 blur-3xl rounded-full bg-[#8b4513]/20 pointer-events-none" />
+      <div className="fixed -bottom-20 -right-20 w-96 h-96 opacity-20 blur-3xl rounded-full bg-[#D4A574]/10 pointer-events-none" />
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-4">
-          <div>
-            <label className="block text-xs text-slate-400 mb-1.5">이메일</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition-colors"
-              placeholder="example@email.com"
-            />
+      {/* Top brand */}
+      <header className="absolute top-0 w-full flex justify-center py-6 z-10">
+        <span className="text-2xl text-[#D4A574] tracking-[0.2em] uppercase font-bold">The Thai</span>
+      </header>
+
+      {/* Login Card */}
+      <main className="relative z-10 w-full max-w-md px-6">
+        <div className="bg-[#333348]/40 backdrop-blur-2xl p-8 md:p-12 rounded-xl shadow-2xl border border-[#54433a]/10 flex flex-col gap-8">
+          {/* Branding */}
+          <div className="text-center space-y-2">
+            <h1 className="text-4xl font-normal text-[#D4A574] tracking-tight" style={{ fontFamily: "'Noto Serif', serif" }}>
+              더 타이
+            </h1>
+            <p className="text-[#a28c81] font-light tracking-widest text-xs uppercase">Management Portal</p>
           </div>
 
-          <div>
-            <label className="block text-xs text-slate-400 mb-1.5">비밀번호</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition-colors"
-              placeholder="••••••••"
-            />
+          {/* Form */}
+          <form onSubmit={handleLogin} className="space-y-6">
+            {/* Email */}
+            <div className="group">
+              <label className="block text-xs font-semibold uppercase tracking-widest text-[#a28c81] mb-2 group-focus-within:text-[#D4A574] transition-colors">
+                이메일
+              </label>
+              <div className="relative">
+                <svg className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#54433a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  placeholder="example@email.com"
+                  className="w-full bg-transparent border-0 border-b border-[#54433a] py-3 pl-8 text-[#e2e0fc] focus:ring-0 focus:border-[#D4A574] placeholder:text-[#54433a]/60 transition-all outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="group">
+              <label className="block text-xs font-semibold uppercase tracking-widest text-[#a28c81] mb-2 group-focus-within:text-[#D4A574] transition-colors">
+                비밀번호
+              </label>
+              <div className="relative">
+                <svg className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#54433a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  className="w-full bg-transparent border-0 border-b border-[#54433a] py-3 pl-8 text-[#e2e0fc] focus:ring-0 focus:border-[#D4A574] placeholder:text-[#54433a]/60 transition-all outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Remember & Auto-login */}
+            <div className="flex items-center justify-between text-sm">
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={rememberEmail}
+                    onChange={e => setRememberEmail(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-[#1e1e32] rounded-full peer-checked:bg-[#D4A574]/20 transition-colors" />
+                  <div className="absolute left-1 top-1 w-3 h-3 bg-[#a28c81] rounded-full peer-checked:translate-x-5 peer-checked:bg-[#D4A574] transition-transform" />
+                </div>
+                <span className="text-[#a28c81] group-hover:text-[#e2e0fc] transition-colors text-xs">아이디 저장</span>
+              </label>
+
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={autoLogin}
+                    onChange={e => setAutoLogin(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-[#1e1e32] rounded-full peer-checked:bg-[#D4A574]/20 transition-colors" />
+                  <div className="absolute left-1 top-1 w-3 h-3 bg-[#a28c81] rounded-full peer-checked:translate-x-5 peer-checked:bg-[#D4A574] transition-transform" />
+                </div>
+                <span className="text-[#a28c81] group-hover:text-[#e2e0fc] transition-colors text-xs">자동 로그인</span>
+              </label>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <p className="text-xs text-red-400 text-center bg-red-900/20 border border-red-800/30 rounded-lg py-2">{error}</p>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 px-6 rounded-lg bg-gradient-to-br from-[#8b4513] to-[#532200] text-[#ffc29f] font-semibold tracking-wide flex items-center justify-center gap-3 hover:opacity-90 active:scale-[0.98] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed group"
+            >
+              <span className="text-lg" style={{ fontFamily: "'Noto Serif', serif" }}>
+                {loading ? '로그인 중...' : '로그인'}
+              </span>
+              {!loading && (
+                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* Status indicator */}
+        <div className="mt-8 flex items-center justify-center gap-4 text-[10px] uppercase tracking-[0.2em] text-[#a28c81]/40">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>System Online</span>
           </div>
+        </div>
+      </main>
 
-          <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={rememberEmail}
-                onChange={e => setRememberEmail(e.target.checked)}
-                className="w-4 h-4 rounded accent-emerald-500"
-              />
-              <span className="text-xs text-slate-400">아이디 저장</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={autoLogin}
-                onChange={e => setAutoLogin(e.target.checked)}
-                className="w-4 h-4 rounded accent-emerald-500"
-              />
-              <span className="text-xs text-slate-400">자동 로그인</span>
-            </label>
-          </div>
-
-          {error && (
-            <p className="text-xs text-red-400 text-center">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-semibold rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-          >
-            {loading ? '로그인 중...' : '로그인'}
-          </button>
-        </form>
-      </div>
+      {/* Footer */}
+      <footer className="absolute bottom-0 w-full flex flex-col items-center gap-2 pb-6 px-4">
+        <p className="text-[10px] text-[#D4A574]/30 tracking-widest uppercase">The Thai Management System</p>
+      </footer>
     </div>
   )
 }

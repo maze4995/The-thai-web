@@ -263,16 +263,9 @@ export default function WorkLogPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-[#0f1117] text-slate-900 dark:text-slate-100">
-      <header className="sticky top-0 z-20 border-b border-slate-200 dark:border-slate-700/60 bg-white dark:bg-[#161b27]">
+    <div className="flex flex-col h-full bg-slate-100 dark:bg-[#0f1117] text-slate-900 dark:text-slate-100">
+      <header className="shrink-0 border-b border-slate-200 dark:border-slate-700/60 bg-white dark:bg-[#161b27]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-          <Link
-            href="/"
-            className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700/60 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-700"
-          >
-            홈으로
-          </Link>
-
           <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">
             근무일지
           </h1>
@@ -322,7 +315,7 @@ export default function WorkLogPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className="flex-1 overflow-y-auto mx-auto max-w-6xl w-full px-4 py-6 sm:px-6 sm:py-8">
         {loading ? (
           <div className="rounded-[28px] border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm dark:border-slate-700/50 dark:bg-[#161b27] dark:text-slate-400">
             불러오는 중...

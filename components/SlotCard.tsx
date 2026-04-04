@@ -3,7 +3,7 @@
 import { DragEvent, useState, useEffect } from 'react'
 import { ScheduleSlot } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
-import { formatTime, formatPrice, getPhoneLastFour, getServiceDuration, addMinutesToTime, getBusinessDate, PAYMENT_LABELS, PAYMENT_COLORS, parseMixedEntries } from '@/lib/utils'
+import { formatTime, formatPrice, getPhoneLastFour, getServiceDuration, addMinutesToTime, getBusinessDate, PAYMENT_LABELS, PAYMENT_COLORS, parseMixedEntries, getCustomerType } from '@/lib/utils'
 
 interface Props {
   slot: ScheduleSlot
@@ -23,10 +23,18 @@ function roundUpTo10(date: Date): string {
   return `${String(h).padStart(2, '0')}:${String(rounded).padStart(2, '0')}`
 }
 
+/** Payment badge color classes */
+const PAYMENT_BADGE_COLORS: Record<string, string> = {
+  cash: 'bg-emerald-600 text-white',
+  card: 'bg-blue-600 text-white',
+  transfer: 'bg-purple-600 text-white',
+  coupon: 'bg-amber-600 text-white',
+  mixed: 'bg-red-500 text-white',
+}
+
 export function SlotCard({ slot, workDate, onClick, onSwapSlot }: Props) {
   const [dropOver, setDropOver] = useState(false)
   const phone = getPhoneLastFour(slot.customer_phone)
-  const paymentColor = PAYMENT_COLORS[slot.payment_type] ?? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600'
   const paymentLabel = (() => {
     if (slot.payment_type !== 'mixed') return PAYMENT_LABELS[slot.payment_type] ?? slot.payment_type
     const entries = parseMixedEntries(slot.memo ?? '')
@@ -35,6 +43,30 @@ export function SlotCard({ slot, workDate, onClick, onSwapSlot }: Props) {
   })()
 
   const hasCheckedIn = !!slot.check_in_time
+
+  // Customer display name: last 4 chars of customer_name, fallback to phone last 4 digits
+  const displayName = (() => {
+    const name = slot.customer_name?.trim()
+    if (name) return name.slice(-4)
+    return phone
+  })()
+
+  // Customer type badge
+  const customerType = getCustomerType(slot.customer_name)
+
+  // Time range display
+  const timeRange = (() => {
+    if (slot.check_in_time && slot.check_out_time) {
+      return `${formatTime(slot.check_in_time)} ~ ${formatTime(slot.check_out_time)}`
+    }
+    if (slot.reserved_time) {
+      return formatTime(slot.reserved_time)
+    }
+    return ''
+  })()
+
+  // Border color: green for normal/finished, yellow for serving (checked in but not finished)
+  const isServing = hasCheckedIn && !false // will be refined by isFinished below
 
   // Normalize time to business-day minutes (06:00=0, 23:00=1020, 00:00=1080, 05:59=1439)
   const toBizMin = (h: number, m: number) => { let t = h * 60 + m - 360; if (t < 0) t += 1440; return t }
@@ -57,6 +89,12 @@ export function SlotCard({ slot, workDate, onClick, onSwapSlot }: Props) {
     const interval = setInterval(check, 30000)
     return () => clearInterval(interval)
   }, [slot.check_in_time, slot.check_out_time, workDate])
+
+  // Left border color: yellow when serving (checked in, not finished), green otherwise
+  const borderColor = (hasCheckedIn && !isFinished) ? 'border-l-yellow-400' : 'border-l-emerald-500'
+
+  // Payment badge color
+  const paymentBadgeColor = PAYMENT_BADGE_COLORS[slot.payment_type] ?? 'bg-slate-600 text-white'
 
   const handleDragStart = (e: DragEvent) => {
     e.dataTransfer.setData('application/slot-id', slot.id)
@@ -119,65 +157,72 @@ export function SlotCard({ slot, workDate, onClick, onSwapSlot }: Props) {
       onDragLeave={handleSlotDragLeave}
       onDrop={handleSlotDrop}
       onClick={onClick}
-      className={`w-full text-left rounded-lg p-1.5 sm:p-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing group border ${
+      className={`w-full text-left rounded-lg p-2 sm:p-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing group border-l-[3px] ${borderColor} ${
         dropOver
-          ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-500 ring-1 ring-amber-400/50'
+          ? 'bg-amber-900/30 ring-1 ring-amber-400/50'
           : isFinished
-          ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700/50 hover:bg-yellow-100 dark:hover:bg-yellow-900/30'
-          : 'bg-slate-50 dark:bg-[#1e2535] hover:bg-slate-100 dark:hover:bg-[#252d40] border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-500'
+          ? 'bg-yellow-900/20 hover:bg-yellow-900/30 border border-yellow-700/30'
+          : 'bg-[#1e2535] hover:bg-[#252d40]'
       }`}
     >
-      {/* Row 1: Phone + Room + Finished badge */}
+      {/* Row 1: Customer Name + Room badge */}
       <div className="flex items-center justify-between mb-1 sm:mb-1.5">
-        <div className="flex items-center gap-1 sm:gap-1.5">
-          <span className="text-slate-900 dark:text-slate-100 font-bold text-xs sm:text-sm tracking-wider">{phone}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-white font-bold text-xs sm:text-sm truncate">{displayName}</span>
           {isFinished && (
-            <span className="text-[9px] sm:text-[10px] font-bold tracking-wider bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 px-1 sm:px-1.5 py-0.5 rounded">
+            <span className="text-[9px] sm:text-[10px] font-bold tracking-wider bg-emerald-600 text-white px-1.5 py-0.5 rounded">
               완료
             </span>
           )}
+          {hasCheckedIn && !isFinished && (
+            <span className="text-[9px] sm:text-[10px] font-bold tracking-wider bg-red-500 text-white px-1.5 py-0.5 rounded animate-pulse">
+              관리중
+            </span>
+          )}
         </div>
-        <span className="text-[10px] sm:text-xs font-semibold rounded px-1 sm:px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+        <span className="text-[10px] sm:text-xs font-semibold rounded px-1.5 py-0.5 bg-[#141b27] text-slate-300 flex-shrink-0 ml-1">
           {slot.room_number}번방
         </span>
       </div>
 
-      {/* Row 2: Service + Price */}
-      <div className="flex items-center justify-between mb-1 sm:mb-1.5">
-        <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs sm:text-sm">{slot.service_name}</span>
-        <span className={`text-[10px] sm:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded border ${paymentColor}`}>
-          {paymentLabel}{slot.payment_type !== 'mixed' && ` ${formatPrice(slot.service_price)}`}
+      {/* Row 2: Service name in golden/amber */}
+      <div className="mb-1 sm:mb-1.5">
+        <span className="text-amber-400 font-semibold text-xs sm:text-sm">{slot.service_name}</span>
+      </div>
+
+      {/* Row 3: Clock icon + time range */}
+      {timeRange && (
+        <div className="flex items-center gap-1 mb-1.5 sm:mb-2">
+          <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 6v6l4 2" />
+          </svg>
+          <span className="text-slate-300 text-[10px] sm:text-xs font-medium">{timeRange}</span>
+        </div>
+      )}
+
+      {/* Row 4: Payment badge + Price */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full ${paymentBadgeColor}`}>
+          {paymentLabel}
+        </span>
+        <span className="text-[10px] sm:text-xs text-slate-300 font-medium">
+          {formatPrice(slot.service_price)}
         </span>
       </div>
 
-      {/* Row 3: Time info (vertical) */}
-      <div className="flex flex-col gap-0.5 text-[10px] sm:text-xs">
-        {slot.reserved_time && (
-          <div className="flex items-center justify-between">
-            <span className="text-amber-400 dark:text-amber-500 w-5 sm:w-6">예약</span>
-            <span className="text-amber-500 dark:text-amber-400 font-medium">{formatTime(slot.reserved_time)}</span>
-          </div>
-        )}
-        <div className="flex items-center justify-between">
-          <span className="text-slate-400 dark:text-slate-500 w-5 sm:w-6">입</span>
-          <span className="text-slate-600 dark:text-slate-300 font-medium">{formatTime(slot.check_in_time)}</span>
+      {/* Row 5: Memo */}
+      {slot.memo && (
+        <div className="mt-1.5 pt-1 border-t border-slate-700/40">
+          <span className="text-[10px] sm:text-xs text-slate-400 line-clamp-2">{slot.memo}</span>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-slate-400 dark:text-slate-500 w-5 sm:w-6">출</span>
-          <span className="text-slate-600 dark:text-slate-300 font-medium">{formatTime(slot.check_out_time)}</span>
-        </div>
-      </div>
-
-      {/* Row 4: Memo */}
-      <div className="mt-1 sm:mt-1.5 pt-1 sm:pt-1.5 border-t border-slate-200 dark:border-slate-700/40">
-        <span className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 line-clamp-1 sm:line-clamp-2">{slot.memo || '\u00A0'}</span>
-      </div>
+      )}
 
       {/* Arrival button - shown only when no check-in time */}
       {!hasCheckedIn && (
         <button
           onClick={handleArrival}
-          className="w-full mt-1.5 sm:mt-2 py-1 sm:py-1.5 bg-amber-500 hover:bg-amber-400 dark:bg-amber-600 dark:hover:bg-amber-500 text-white text-[10px] sm:text-xs font-bold rounded-md transition-colors"
+          className="w-full mt-1.5 sm:mt-2 py-1 sm:py-1.5 bg-amber-500 hover:bg-amber-400 text-white text-[10px] sm:text-xs font-bold rounded-md transition-colors"
         >
           손님도착
         </button>

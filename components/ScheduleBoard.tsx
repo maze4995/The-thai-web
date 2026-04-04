@@ -32,7 +32,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
   const [manager, setManager] = useState('')
   const [editingManager, setEditingManager] = useState(false)
-  const { theme, toggle } = useTheme()
+  const { } = useTheme()
   const { storeId, storeName, signOut } = useStore()
 
   const fetchData = useCallback(async (workDate: string) => {
@@ -381,145 +381,103 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-100 dark:bg-[#0f1117] text-slate-800 dark:text-slate-200">
-      {/* Header - single row */}
-      <header className="shrink-0 bg-white dark:bg-[#161b27] border-b border-slate-200 dark:border-slate-700/60">
-        <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3">
-          <div className="flex items-center gap-2 shrink-0">
-            <h1 className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">{storeName ?? 'The Thai'}</h1>
-            {editingManager ? (
-              <input
-                autoFocus
-                type="text"
-                defaultValue={manager}
-                placeholder="담당자"
-                onBlur={e => saveManager(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') saveManager((e.target as HTMLInputElement).value) }}
-                className="w-16 sm:w-20 h-6 px-1.5 bg-slate-50 dark:bg-slate-800 border border-emerald-500 rounded text-[10px] sm:text-xs text-slate-900 dark:text-slate-100 outline-none"
-              />
-            ) : (
-              <button
-                onClick={() => setEditingManager(true)}
-                className="h-6 px-1.5 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 transition-colors"
-              >
-                {manager || '담당자'}
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1 sm:gap-1.5">
-            <button
-              onClick={() => navigateDate(-1)}
-              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-xs sm:text-sm transition-colors"
-            >
-              ←
-            </button>
-            <button
-              onClick={goToToday}
-              className={`px-2 sm:px-2.5 h-7 sm:h-8 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                isToday ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              오늘
-            </button>
-            <input
-              type="date"
-              value={date}
-              onChange={e => e.target.value && setDate(e.target.value)}
-              className="h-7 sm:h-8 px-2 sm:px-3 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 border-none outline-none cursor-pointer transition-colors"
-              style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
-            />
-            <button
-              onClick={() => navigateDate(1)}
-              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-xs sm:text-sm transition-colors"
-            >
-              →
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <button
-              onClick={toggle}
-              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs sm:text-sm transition-colors"
-              title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
-            >
-              {theme === 'dark' ? '☀️' : '🌙'}
-            </button>
-            <a
-              href="/worklog"
-              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 transition-colors"
-            >
-              근무일지
-            </a>
-<a
-              href="/stats"
-              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 transition-colors"
-            >
-              통계
-            </a>
-            <a
-              href="/therapists"
-              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 transition-colors"
-            >
-              관리사
-            </a>
-            <a
-              href="/guide"
-              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 transition-colors"
-            >
-              ?
-            </a>
-            <button
-              onClick={signOut}
-              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-200 dark:bg-slate-700/60 hover:bg-red-200 dark:hover:bg-red-900/40 hover:text-red-600 dark:hover:text-red-400 rounded text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 transition-colors"
-            >
-              로그아웃
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-auto p-2 sm:p-3 min-h-0">
-        {presentTherapists.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500">
-            <div className="text-center">
-              <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">📋</div>
-              <div className="text-sm sm:text-lg font-medium mb-2">출근한 관리사가 없습니다</div>
-              <a href="/therapists" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 text-xs sm:text-sm underline underline-offset-2">
-                관리사 출근 처리하기 →
-              </a>
+    <div className="flex flex-col flex-1 min-w-0 h-screen bg-[#0f1117] text-slate-200">
+        {/* Header */}
+        <header className="shrink-0 bg-[#161b27] border-b border-slate-700/60">
+          <div className="grid grid-cols-3 items-center px-4 py-2.5">
+            {/* Left: Title + Manager */}
+            <div className="flex items-center gap-3 shrink-0">
+              <h1 className="text-base font-bold text-[#D4A574] tracking-tight">
+                {storeName ?? 'The Thai'}
+              </h1>
+              {editingManager ? (
+                <input
+                  autoFocus
+                  type="text"
+                  defaultValue={manager}
+                  placeholder="담당자"
+                  onBlur={e => saveManager(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveManager((e.target as HTMLInputElement).value) }}
+                  className="w-20 h-7 px-2 bg-slate-800 border border-[#D4A574] rounded text-xs text-slate-100 outline-none"
+                />
+              ) : (
+                <button
+                  onClick={() => setEditingManager(true)}
+                  className="h-7 px-2 bg-slate-800/60 hover:bg-slate-700 rounded text-xs text-slate-400 transition-colors"
+                >
+                  {manager || '담당자'}
+                </button>
+              )}
             </div>
-          </div>
-        ) : (
-          <div
-            className="grid gap-2 sm:gap-3 h-full"
-            style={{ gridTemplateColumns: `repeat(5, minmax(160px, 1fr))` }}
-          >
-            {presentTherapists.map(therapist => (
-              <TherapistColumn
-                key={therapist.id}
-                therapist={therapist}
-                workDate={date}
-                onAddSlot={() => handleAddSlot(therapist.id)}
-                onEditSlot={handleEditSlot}
-                onDropSlot={handleDropSlot}
-                onSwapSlots={handleSwapSlots}
-                onDropColumn={handleDropColumn}
-              />
-            ))}
-            {Array.from({ length: Math.max(0, 5 - presentTherapists.length) }).map((_, i) => (
-              <div
-                key={`empty-col-${i}`}
-                className="flex flex-col bg-white/40 dark:bg-[#161b27]/40 border border-dashed border-slate-200 dark:border-slate-700/30 rounded-xl"
-              />
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Summary */}
-      <SummaryFooter slots={slots} therapists={presentTherapists} />
+            {/* Center: Date Navigation */}
+            <div className="flex items-center justify-center gap-1.5">
+              <button
+                onClick={() => navigateDate(-1)}
+                className="w-8 h-8 flex items-center justify-center bg-slate-700/60 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors"
+              >
+                ‹
+              </button>
+              <div className="flex items-center gap-1.5 bg-slate-800/60 hover:bg-slate-700/60 rounded-lg px-3 h-8 cursor-pointer transition-colors">
+                <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={e => e.target.value && setDate(e.target.value)}
+                  className="bg-transparent text-sm font-semibold text-slate-100 border-none outline-none cursor-pointer"
+                  style={{ colorScheme: 'dark' }}
+                />
+              </div>
+              <button
+                onClick={() => navigateDate(1)}
+                className="w-8 h-8 flex items-center justify-center bg-slate-700/60 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors"
+              >
+                ›
+              </button>
+            </div>
+
+            {/* Right: empty for balance */}
+            <div />
+          </div>
+        </header>
+
+        {/* Board */}
+        <div className="flex-1 overflow-x-auto overflow-y-auto p-3 min-h-0">
+          {presentTherapists.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-slate-500">
+              <div className="text-center">
+                <div className="text-5xl mb-4">📋</div>
+                <div className="text-lg font-medium mb-2">출근한 관리사가 없습니다</div>
+                <a href="/therapists" className="text-[#D4A574] hover:text-[#c49464] text-sm underline underline-offset-2">
+                  관리사 출근 처리하기 →
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="grid gap-3 h-full"
+              style={{ gridTemplateColumns: `repeat(${Math.max(presentTherapists.length, 5)}, minmax(200px, 1fr))` }}
+            >
+              {presentTherapists.map(therapist => (
+                <TherapistColumn
+                  key={therapist.id}
+                  therapist={therapist}
+                  workDate={date}
+                  onAddSlot={() => handleAddSlot(therapist.id)}
+                  onEditSlot={handleEditSlot}
+                  onDropSlot={handleDropSlot}
+                  onSwapSlots={handleSwapSlots}
+                  onDropColumn={handleDropColumn}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Summary */}
+        <SummaryFooter slots={slots} therapists={presentTherapists} manager={manager} />
 
       {/* Modal */}
       {modalOpen && selectedTherapistId && (

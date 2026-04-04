@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { ThemeProvider } from "@/components/ThemeProvider"
 import { StoreProvider } from "@/components/StoreProvider"
+import { AppShell } from "@/components/AppShell"
 
 export const metadata: Metadata = {
   title: "The Thai Web - 조판지",
@@ -24,7 +25,9 @@ export default function RootLayout({
         />
         <StoreProvider>
           <ThemeProvider>
-            {children}
+            <AppShell>
+              {children}
+            </AppShell>
           </ThemeProvider>
         </StoreProvider>
       </body>
