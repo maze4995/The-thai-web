@@ -11,8 +11,6 @@ import { useTheme } from './ThemeProvider'
 import { useStore } from './StoreProvider'
 import { resolveServicePrice, useStoreServices } from '@/lib/service-config'
 
-const MAX_SLOTS = 7
-
 // Module-level dedup: persists across React Strict Mode remounts
 const processedReservationIds = new Set<string>()
 
@@ -87,13 +85,9 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   }, [date, fetchData, storeId])
 
   // Keep refs in sync for use in realtime callback
-  const therapistsRef = useRef(therapists)
-  const attendanceRef = useRef(attendance)
   const slotsRef = useRef(slots)
   const dateRef = useRef(date)
   const storeIdRef = useRef(storeId)
-  useEffect(() => { therapistsRef.current = therapists }, [therapists])
-  useEffect(() => { attendanceRef.current = attendance }, [attendance])
   useEffect(() => { slotsRef.current = slots }, [slots])
   useEffect(() => { dateRef.current = date }, [date])
   useEffect(() => { storeIdRef.current = storeId }, [storeId])
@@ -135,35 +129,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         .limit(1)
       if (existing && existing.length > 0) return
 
-      const currentAttendance = attendanceRef.current
-      const currentTherapists = therapistsRef.current
       const currentSlots = slotsRef.current
-      const presentAttendance = currentAttendance.filter(a => a.is_present)
-      const attendanceOrder = new Map(presentAttendance.map(a => [a.therapist_id, a.display_order ?? 0]))
-      const present = currentTherapists
-        .filter(t => attendanceOrder.has(t.id))
-        .sort((a, b) => (attendanceOrder.get(a.id) ?? 0) - (attendanceOrder.get(b.id) ?? 0))
-
-      if (present.length === 0) return
-
-      const slotCounts = new Map<string, number>()
-      for (const t of present) slotCounts.set(t.id, 0)
-      for (const s of currentSlots) {
-        const prev = slotCounts.get(s.therapist_id)
-        if (prev !== undefined) slotCounts.set(s.therapist_id, prev + 1)
-      }
-
-      const sorted = [...present]
-        .filter(t => (slotCounts.get(t.id) ?? 0) < MAX_SLOTS)
-        .sort((a, b) => {
-          const countDiff = (slotCounts.get(a.id) ?? 0) - (slotCounts.get(b.id) ?? 0)
-          if (countDiff !== 0) return countDiff
-          return (attendanceOrder.get(a.id) ?? 0) - (attendanceOrder.get(b.id) ?? 0)
-        })
-
-      const assignTo = sorted[0]
-      if (!assignTo) return
-
       const mappedService = mapServiceName(reservation.service_name ?? '')
       const price = resolveServicePrice(
         mappedService,
@@ -176,16 +142,10 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       const resMemo = reservation.memo ?? ''
       const combinedMemo = [autoMemo, resMemo].filter(Boolean).join(' ')
 
-      const maxOrder = currentSlots
-        .filter(s => s.therapist_id === assignTo.id)
-        .reduce((max, s) => Math.max(max, s.slot_order ?? 0), 0)
-
       const { error } = await supabase.rpc('auto_assign_schedule_slot', {
         p_store_id: currentStoreId,
         p_work_date: currentDate,
         p_reservation_id: reservation.id,
-        p_therapist_id: assignTo.id,
-        p_therapist_name: assignTo.name,
         p_customer_name: reservation.customer_name,
         p_customer_phone: reservation.customer_phone,
         p_service_name: mappedService,
@@ -194,7 +154,6 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         p_reserved_time: reservation.reserved_time?.slice(0, 5) ?? null,
         p_payment_type: 'cash',
         p_memo: combinedMemo,
-        p_slot_order: maxOrder + 1,
       })
 
       if (error) {
