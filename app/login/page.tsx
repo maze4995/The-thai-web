@@ -1,12 +1,24 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { DEFAULT_BRAND_NAME, DEFAULT_PRODUCT_LABEL } from '@/lib/branding'
 
 const STORAGE_EMAIL_KEY = 'login_saved_email'
 const STORAGE_REMEMBER_KEY = 'login_remember_email'
 const STORAGE_AUTO_KEY = 'login_auto_login'
+
+function getStoredFlag(key: string) {
+  if (typeof window === 'undefined') return false
+  return localStorage.getItem(key) === 'true'
+}
+
+function getStoredEmail() {
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem(STORAGE_EMAIL_KEY) ?? ''
+}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -16,28 +28,33 @@ export default function LoginPage() {
   const [autoLogin, setAutoLogin] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [checking, setChecking] = useState(true)
+  const [checking, setChecking] = useState(false)
 
   useEffect(() => {
-    const savedRemember = localStorage.getItem(STORAGE_REMEMBER_KEY) === 'true'
-    const savedAuto = localStorage.getItem(STORAGE_AUTO_KEY) === 'true'
-    setRememberEmail(savedRemember)
-    setAutoLogin(savedAuto)
-    if (savedRemember) {
-      setEmail(localStorage.getItem(STORAGE_EMAIL_KEY) ?? '')
-    }
+    const timeoutId = window.setTimeout(() => {
+      const savedRemember = getStoredFlag(STORAGE_REMEMBER_KEY)
+      const savedAuto = getStoredFlag(STORAGE_AUTO_KEY)
 
-    if (savedAuto) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          router.replace('/')
-        } else {
-          setChecking(false)
-        }
-      })
-    } else {
-      setChecking(false)
-    }
+      setRememberEmail(savedRemember)
+      setAutoLogin(savedAuto)
+
+      if (savedRemember) {
+        setEmail(getStoredEmail())
+      }
+
+      if (savedAuto) {
+        setChecking(true)
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            router.replace('/')
+          } else {
+            setChecking(false)
+          }
+        })
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -82,7 +99,7 @@ export default function LoginPage() {
 
       {/* Top brand */}
       <header className="absolute top-0 w-full flex justify-center py-6 z-10">
-        <span className="text-2xl text-[#D4A574] tracking-[0.2em] uppercase font-bold">The Thai</span>
+        <span className="text-2xl text-[#D4A574] tracking-[0.2em] uppercase font-bold">{DEFAULT_BRAND_NAME}</span>
       </header>
 
       {/* Login Card */}
@@ -192,6 +209,13 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          <div className="text-center text-xs text-[#a28c81]">
+            아직 계정이 없다면{' '}
+            <Link href="/signup" className="font-semibold text-[#D4A574] transition-colors hover:text-[#f1c28d]">
+              회원가입
+            </Link>
+          </div>
         </div>
 
         {/* Status indicator */}
@@ -205,7 +229,7 @@ export default function LoginPage() {
 
       {/* Footer */}
       <footer className="absolute bottom-0 w-full flex flex-col items-center gap-2 pb-6 px-4">
-        <p className="text-[10px] text-[#D4A574]/30 tracking-widest uppercase">The Thai Management System</p>
+        <p className="text-[10px] text-[#D4A574]/30 tracking-widest uppercase">{DEFAULT_PRODUCT_LABEL}</p>
       </footer>
     </div>
   )

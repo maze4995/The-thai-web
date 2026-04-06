@@ -1,6 +1,4 @@
 'use client'
-
-import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useStore } from '@/components/StoreProvider'
@@ -99,7 +97,7 @@ export default function WorkLogPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [autoSaved, setAutoSaved] = useState(false)
-  const { storeId, storeName } = useStore()
+  const { storeId, storeName, features, settings } = useStore()
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstLoad = useRef(true)
   const customerItemsRef = useRef<HTMLDivElement>(null)
@@ -158,7 +156,6 @@ export default function WorkLogPage() {
     }
   }, [dateStr, storeId])
 
-  // Recalculate textarea heights after log loads (content may be multi-line)
   useEffect(() => {
     if (loading) return
     const el = customerItemsRef.current
@@ -169,7 +166,6 @@ export default function WorkLogPage() {
     })
   }, [loading, log.customer_items])
 
-  // Auto-save: 300ms debounce (Notion-style — feels instant)
   useEffect(() => {
     if (loading) return
     if (isFirstLoad.current) {
@@ -262,6 +258,27 @@ export default function WorkLogPage() {
     setSaving(false)
   }
 
+  if (!features.worklogEnabled) {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[#f5f7fb] dark:bg-[#0b1220]">
+        <div className="mx-auto max-w-3xl px-6 py-12">
+          <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              업무일지 기능이 비활성화되어 있습니다
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">
+              현재 매장에서는 업무일지를 사용하지 않도록 설정되어 있습니다.
+              필요하면 설정 단계에서 다시 활성화할 수 있습니다.
+            </p>
+            <div className="mt-5 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+              현재 직원 라벨: {settings.staffLabel}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full bg-slate-100 dark:bg-[#0f1117] text-slate-900 dark:text-slate-100">
       <header className="shrink-0 border-b border-slate-200 dark:border-slate-700/60 bg-white dark:bg-[#161b27]">
@@ -347,11 +364,11 @@ export default function WorkLogPage() {
               </section>
 
               <section>
-                <SectionTitle index="02" title="관리사 특이사항" />
+                <SectionTitle index="02" title={`${settings.staffLabel} 특이사항`} />
                 <TextareaField
                   value={log.therapist_notes}
                   onChange={value => updateField('therapist_notes', value)}
-                  placeholder="관리사 관련 내용을 기록하세요."
+                  placeholder={`${settings.staffLabel} 관련 내용을 기록하세요.`}
                   minRows={5}
                 />
               </section>

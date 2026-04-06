@@ -1,7 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+const AUTH_ROUTES = new Set(['/login', '/signup'])
+const ONBOARDING_ROUTE = '/onboarding'
+
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -23,19 +26,37 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // 세션 갱신 (쿠키에서 로컬 읽기 — 네트워크 실패로 로그아웃되는 현상 방지)
-  const { data: { session } } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
   const user = session?.user ?? null
+  const pathname = request.nextUrl.pathname
+  const isAuthRoute = AUTH_ROUTES.has(pathname)
+  const isOnboardingRoute = pathname === ONBOARDING_ROUTE
 
-  const isLoginPage = request.nextUrl.pathname === '/login'
+  if (!user) {
+    if (isAuthRoute) {
+      return supabaseResponse
+    }
 
-  // 미로그인 → /login 으로 리다이렉트
-  if (!user && !isLoginPage) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // 이미 로그인 → / 으로 리다이렉트
-  if (user && isLoginPage) {
+  const { data: membership } = await supabase
+    .from('store_members')
+    .select('store_id')
+    .eq('user_id', user.id)
+    .limit(1)
+    .maybeSingle()
+
+  const hasStoreMembership = Boolean(membership?.store_id)
+
+  if (!hasStoreMembership && !isOnboardingRoute) {
+    return NextResponse.redirect(new URL('/onboarding', request.url))
+  }
+
+  if (hasStoreMembership && isAuthRoute) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -43,7 +64,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }

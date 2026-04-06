@@ -6,9 +6,10 @@ import { Therapist, DailyAttendance, ScheduleSlot, TherapistWithSlots, Reservati
 import { TherapistColumn } from './TherapistColumn'
 import { SummaryFooter } from './SummaryFooter'
 import { SlotModal } from './SlotModal'
-import { formatDate, toDateString, getBusinessDate, mapServiceName, getServicePrice, getServiceDuration, addMinutesToTime, getAvailableRoom, isReservationInBusinessDay, getAutoMemo } from '@/lib/utils'
+import { toDateString, getBusinessDate, mapServiceName, getServicePrice, getAvailableRoom, isReservationInBusinessDay, getAutoMemo } from '@/lib/utils'
 import { useTheme } from './ThemeProvider'
 import { useStore } from './StoreProvider'
+import { resolveServicePrice, useStoreServices } from '@/lib/service-config'
 
 const MAX_SLOTS = 7
 
@@ -24,7 +25,7 @@ interface Props {
 
 export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlots, initialDate }: Props) {
   const [date, setDate] = useState(initialDate)
-  const [therapists, setTherapists] = useState(initialTherapists)
+  const [therapists] = useState(initialTherapists)
   const [attendance, setAttendance] = useState(initialAttendance)
   const [slots, setSlots] = useState(initialSlots)
   const [modalOpen, setModalOpen] = useState(false)
@@ -33,7 +34,9 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const [manager, setManager] = useState('')
   const [editingManager, setEditingManager] = useState(false)
   const { } = useTheme()
-  const { storeId, storeName, signOut } = useStore()
+  const { storeId, storeName, settings, features } = useStore()
+  const staffLabel = settings.staffLabel
+  const { serviceOptions } = useStoreServices(storeId)
 
   const fetchData = useCallback(async (workDate: string) => {
     if (!storeId) {
@@ -59,7 +62,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         .select('manager')
         .eq('store_id', storeId)
         .eq('work_date', workDate)
-        .single(),
+        .maybeSingle(),
     ])
     setAttendance(attendanceRes.data ?? [])
     setSlots(slotsRes.data ?? [])
@@ -68,11 +71,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
 
   // On mount, always reset to today's business date
   useEffect(() => {
-    const today = getBusinessDate(new Date())
-    if (date !== today) {
-      setDate(today)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setDate(getBusinessDate(new Date()))
   }, [])
 
   useEffect(() => {
@@ -159,7 +158,11 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       if (!assignTo) return
 
       const mappedService = mapServiceName(reservation.service_name ?? '')
-      const price = getServicePrice(mappedService, reservation.customer_name ?? '')
+      const price = resolveServicePrice(
+        mappedService,
+        reservation.customer_name ?? '',
+        serviceOptions
+      ) || getServicePrice(mappedService, reservation.customer_name ?? '')
       const usedRooms = currentSlots.map(s => s.room_number)
       const roomNumber = getAvailableRoom(mappedService, usedRooms)
       const autoMemo = getAutoMemo(reservation.customer_name ?? '')
@@ -213,7 +216,6 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     return () => {
       supabase.removeChannel(channel)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId])
 
   const navigateDate = (delta: number) => {
@@ -221,8 +223,6 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     d.setDate(d.getDate() + delta)
     setDate(toDateString(d))
   }
-
-  const goToToday = () => setDate(getBusinessDate(new Date()))
 
   const saveManager = async (name: string) => {
     setManager(name)
@@ -284,9 +284,6 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
 
   const presentTherapists: TherapistWithSlots[] = [...fromTherapists, ...fromOrphans]
     .sort((a, b) => a.display_order - b.display_order)
-
-  const isToday = date === toDateString(new Date())
-  const dateObj = new Date(date + 'T00:00:00')
 
   const handleAddSlot = (therapistId: string) => {
     setSelectedTherapistId(therapistId)
@@ -380,6 +377,35 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     )
   }
 
+  if (!features.scheduleBoardEnabled) {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[#0f1117]">
+        <div className="px-8 py-10">
+          <div className="mx-auto max-w-2xl rounded-3xl border border-slate-700/30 bg-[#131825] p-8 text-center shadow-2xl shadow-black/30">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800 text-slate-300">
+              <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+            <h2 className="mb-2 text-2xl font-bold text-white">조판 기능이 비활성화되어 있습니다</h2>
+            <p className="text-sm leading-7 text-slate-400">
+              이 매장은 아직 조판 기능을 사용하지 않도록 설정되어 있습니다.
+              설정을 활성화하면 기존 화면과 동일한 방식으로 사용할 수 있습니다.
+            </p>
+            <div className="mt-5 inline-flex rounded-full border border-[#D4A574]/30 bg-[#1a2035] px-4 py-2 text-xs font-medium text-[#D4A574]">
+              현재 직원 라벨: {staffLabel}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col flex-1 min-w-0 h-screen bg-[#0f1117] text-slate-200">
         {/* Header */}
@@ -449,9 +475,9 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
             <div className="flex items-center justify-center h-full text-slate-500">
               <div className="text-center">
                 <div className="text-5xl mb-4">📋</div>
-                <div className="text-lg font-medium mb-2">출근한 관리사가 없습니다</div>
+                <div className="text-lg font-medium mb-2">출근한 {staffLabel}이 없습니다</div>
                 <a href="/therapists" className="text-[#D4A574] hover:text-[#c49464] text-sm underline underline-offset-2">
-                  관리사 출근 처리하기 →
+                  {staffLabel} 출근 처리하기 →
                 </a>
               </div>
             </div>

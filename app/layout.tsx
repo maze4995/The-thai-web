@@ -1,13 +1,19 @@
-import type { Metadata } from "next"
-import "./globals.css"
-import { ThemeProvider } from "@/components/ThemeProvider"
-import { StoreProvider } from "@/components/StoreProvider"
-import { AppShell } from "@/components/AppShell"
+import type { Metadata, Viewport } from 'next'
+import './globals.css'
+import { ThemeProvider } from '@/components/ThemeProvider'
+import { StoreProvider } from '@/components/StoreProvider'
+import { AppShell } from '@/components/AppShell'
 
 export const metadata: Metadata = {
-  title: "The Thai Web - 조판지",
-  description: "태국 마사지샵 조판지 관리 시스템",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
+  title: 'The Thai Web - 관리 시스템',
+  description: '매장 운영과 스케줄 관리를 위한 웹 애플리케이션',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({
@@ -25,9 +31,7 @@ export default function RootLayout({
         />
         <StoreProvider>
           <ThemeProvider>
-            <AppShell>
-              {children}
-            </AppShell>
+            <AppShell>{children}</AppShell>
           </ThemeProvider>
         </StoreProvider>
       </body>

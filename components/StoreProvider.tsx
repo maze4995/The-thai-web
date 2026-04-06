@@ -1,19 +1,35 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import {
+  StoreFeatures,
+  StoreSettings,
+  getDefaultStoreFeatures,
+  getDefaultStoreSettings,
+  normalizeStoreFeatures,
+  normalizeStoreSettings,
+} from '@/lib/store-config'
 
 interface StoreContextValue {
   storeId: string | null
   storeName: string | null
+  brandName: string
   userEmail: string | null
+  isLoading: boolean
+  settings: StoreSettings
+  features: StoreFeatures
   signOut: () => Promise<void>
 }
 
 const StoreContext = createContext<StoreContextValue>({
   storeId: null,
   storeName: null,
+  brandName: getDefaultStoreSettings().brandName,
   userEmail: null,
+  isLoading: true,
+  settings: getDefaultStoreSettings(),
+  features: getDefaultStoreFeatures(),
   signOut: async () => {},
 })
 
@@ -25,36 +41,124 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [storeId, setStoreId] = useState<string | null>(null)
   const [storeName, setStoreName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [settings, setSettings] = useState<StoreSettings>(getDefaultStoreSettings())
+  const [features, setFeatures] = useState<StoreFeatures>(getDefaultStoreFeatures())
+  const loadingRef = useRef(false)
+  const lastUserIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     const loadStore = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (loadingRef.current) return
+      loadingRef.current = true
+      setIsLoading(true)
 
-      setUserEmail(user.email ?? null)
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        const user = session?.user ?? null
 
-      const { data } = await supabase
-        .from('store_members')
-        .select('store_id, stores(name)')
-        .eq('user_id', user.id)
-        .single()
+        if (!user) {
+          setStoreId(null)
+          setStoreName(null)
+          setUserEmail(null)
+          setSettings(getDefaultStoreSettings())
+          setFeatures(getDefaultStoreFeatures())
+          setIsLoading(false)
+          return
+        }
 
-      if (data) {
-        setStoreId(data.store_id)
-        const stores = data.stores as unknown as { name: string } | null
-        setStoreName(stores?.name ?? null)
+        lastUserIdRef.current = user.id
+        setUserEmail(user.email ?? null)
+
+        const { data } = await supabase
+          .from('store_members')
+          .select('store_id, stores(name)')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle()
+
+        if (data) {
+          const stores = data.stores as unknown as { name: string } | null
+          const nextStoreName = stores?.name ?? null
+          const nextStoreId = data.store_id as string
+
+          setStoreId(nextStoreId)
+          setStoreName(nextStoreName)
+
+          const [settingsRes, featuresRes] = await Promise.allSettled([
+            supabase
+              .from('store_settings')
+              .select(`
+                brand_name,
+                app_display_name,
+                contact_prefix,
+                locale,
+                timezone,
+                currency_code,
+                staff_label,
+                customer_label_template,
+                reservation_time_interval,
+                visit_day_starts_at_hour,
+                visit_day_ends_at_hour
+              `)
+              .eq('store_id', nextStoreId)
+              .maybeSingle(),
+            supabase
+              .from('store_features')
+              .select(`
+                legacy_mode,
+                settings_enabled,
+                wallet_enabled,
+                onboarding_enabled,
+                phone_integration_enabled,
+                contact_sync_enabled,
+                schedule_board_enabled,
+                worklog_enabled
+              `)
+              .eq('store_id', nextStoreId)
+              .maybeSingle(),
+          ])
+
+          const settingsRow =
+            settingsRes.status === 'fulfilled' ? settingsRes.value.data : null
+          const featuresRow =
+            featuresRes.status === 'fulfilled' ? featuresRes.value.data : null
+
+          setSettings(normalizeStoreSettings(settingsRow, nextStoreName))
+          setFeatures(normalizeStoreFeatures(featuresRow))
+        } else {
+          setStoreId(null)
+          setStoreName(null)
+          setUserEmail(user.email ?? null)
+          setSettings(getDefaultStoreSettings())
+          setFeatures(getDefaultStoreFeatures())
+        }
+      } finally {
+        setIsLoading(false)
+        loadingRef.current = false
       }
     }
 
     loadStore()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setStoreId(null)
         setStoreName(null)
         setUserEmail(null)
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setSettings(getDefaultStoreSettings())
+        setFeatures(getDefaultStoreFeatures())
+        setIsLoading(false)
+        lastUserIdRef.current = null
+      } else if (event === 'SIGNED_IN') {
         loadStore()
+      } else if (event === 'TOKEN_REFRESHED') {
+        const nextUserId = session?.user?.id ?? null
+        if (nextUserId && nextUserId !== lastUserIdRef.current) {
+          loadStore()
+        }
       }
     })
 
@@ -67,7 +171,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <StoreContext.Provider value={{ storeId, storeName, userEmail, signOut }}>
+    <StoreContext.Provider
+      value={{
+        storeId,
+        storeName,
+        brandName: settings.brandName,
+        userEmail,
+        isLoading,
+        settings,
+        features,
+        signOut,
+      }}
+    >
       {children}
     </StoreContext.Provider>
   )

@@ -2,6 +2,8 @@
 
 import { ScheduleSlot, TherapistWithSlots } from '@/lib/types'
 import { formatPrice, getServiceCommission, getCustomerType, parseMixedEntries } from '@/lib/utils'
+import { resolveServiceCommission, useStoreServices } from '@/lib/service-config'
+import { useStore } from './StoreProvider'
 
 interface Props {
   slots: ScheduleSlot[]
@@ -10,6 +12,8 @@ interface Props {
 }
 
 export function SummaryFooter({ slots, therapists, manager }: Props) {
+  const { storeId } = useStore()
+  const { serviceOptions } = useStoreServices(storeId)
   const isSpecial = (s: ScheduleSlot) => s.memo?.includes('스페셜')
   const isCoupon = (s: ScheduleSlot) => /cm/i.test(s.memo ?? '')
   const getMixedAmount = (slot: ScheduleSlot, label: string) =>
@@ -47,7 +51,10 @@ export function SummaryFooter({ slots, therapists, manager }: Props) {
 
   const commissions = therapists.map(t => {
     const therapistSlots = slots.filter(s => s.therapist_id === t.id)
-    const commission = therapistSlots.reduce((sum, slot) => sum + getServiceCommission(slot.service_name), 0)
+    const commission = therapistSlots.reduce(
+      (sum, slot) => sum + (resolveServiceCommission(slot.service_name, serviceOptions) || getServiceCommission(slot.service_name)),
+      0
+    )
     return { name: t.name, count: therapistSlots.length, commission }
   })
 

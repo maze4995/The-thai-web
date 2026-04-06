@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { ScheduleBoard } from '@/components/ScheduleBoard'
 import { getBusinessDate } from '@/lib/utils'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,14 +12,21 @@ export default async function HomePage() {
     data: { user },
   } = await supabase.auth.getUser()
 
+  if (!user) {
+    redirect('/login')
+  }
+
   let storeId: string | null = null
-  if (user) {
-    const { data: membership } = await supabase
-      .from('store_members')
-      .select('store_id')
-      .eq('user_id', user.id)
-      .single()
-    storeId = membership?.store_id ?? null
+  const { data: membership } = await supabase
+    .from('store_members')
+    .select('store_id')
+    .eq('user_id', user.id)
+    .limit(1)
+    .maybeSingle()
+  storeId = membership?.store_id ?? null
+
+  if (!storeId) {
+    redirect('/onboarding')
   }
 
   const [therapistsRes, attendanceRes, slotsRes] = storeId

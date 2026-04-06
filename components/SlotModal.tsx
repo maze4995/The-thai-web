@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Reservation, PaymentType } from '@/lib/types'
-import { SERVICES, PAYMENT_LABELS, addMinutesToTime, getServiceDuration, mapServiceName, getServicePrice, getAutoMemo, formatPhone, isReservationInBusinessDay, parseMixedEntries, buildMixedComboMemo, MixedPaymentEntry } from '@/lib/utils'
+import { PAYMENT_LABELS, addMinutesToTime, getServiceDuration, mapServiceName, getServicePrice, getAutoMemo, formatPhone, isReservationInBusinessDay, parseMixedEntries, buildMixedComboMemo, MixedPaymentEntry } from '@/lib/utils'
 import { useStore } from '@/components/StoreProvider'
+import { resolveServiceDuration, resolveServicePrice, useStoreServices } from '@/lib/service-config'
 
 interface Props {
   therapistId: string
@@ -57,6 +58,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const { storeId } = useStore()
+  const { serviceOptions } = useStoreServices(storeId)
 
   useEffect(() => {
     const fetchReservations = async () => {
@@ -91,24 +93,20 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
     fetchReservations()
   }, [storeId, workDate])
 
-  // Auto-calculate check-out when check-in or service changes
-  useEffect(() => {
-    if (checkIn && serviceName) {
-      const duration = getServiceDuration(serviceName)
-      setCheckOut(addMinutesToTime(checkIn, duration))
-    }
-  }, [checkIn, serviceName])
-
   // Auto-set price when service changes (respects road pricing)
   const handleServiceChange = (name: string) => {
     setServiceName(name)
-    setServicePrice(getServicePrice(name, customerName))
+    setServicePrice(resolveServicePrice(name, customerName, serviceOptions) || getServicePrice(name, customerName))
+    if (checkIn) {
+      const duration = resolveServiceDuration(name, serviceOptions) || getServiceDuration(name)
+      setCheckOut(addMinutesToTime(checkIn, duration))
+    }
   }
 
   // Re-calculate price and auto-memo when customer name changes
   const handleCustomerNameChange = (name: string) => {
     setCustomerName(name)
-    setServicePrice(getServicePrice(serviceName, name))
+    setServicePrice(resolveServicePrice(serviceName, name, serviceOptions) || getServicePrice(serviceName, name))
     const auto = getAutoMemo(name)
     if (auto) setMemo(auto)
   }
@@ -119,7 +117,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
     setCustomerPhone(res.customer_phone)
     const mapped = mapServiceName(res.service_name)
     setServiceName(mapped)
-    setServicePrice(getServicePrice(mapped, res.customer_name))
+    setServicePrice(resolveServicePrice(mapped, res.customer_name, serviceOptions) || getServicePrice(mapped, res.customer_name))
     if (res.reserved_time) {
       setReservedTime(res.reserved_time.slice(0, 5))
     }
@@ -314,17 +312,18 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
               <div>
                 <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">서비스</label>
                 <div className="grid grid-cols-5 gap-1.5">
-                  {SERVICES.map(svc => (
+                  {serviceOptions.map(svc => (
                     <button
-                      key={svc.name}
-                      onClick={() => handleServiceChange(svc.name)}
+                      key={svc.code}
+                      onClick={() => handleServiceChange(svc.code)}
                       className={`py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                        serviceName === svc.name
+                        serviceName === svc.code
                           ? 'bg-emerald-700 text-emerald-100 border border-emerald-500'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500'
                       }`}
+                      title={svc.label}
                     >
-                      {svc.name}
+                      {svc.code}
                     </button>
                   ))}
                 </div>
@@ -460,12 +459,19 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">입실시간</label>
-                  <input
-                    type="time"
-                    value={checkIn}
-                    onChange={e => setCheckIn(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
-                  />
+                <input
+                  type="time"
+                  value={checkIn}
+                  onChange={e => {
+                    const nextCheckIn = e.target.value
+                    setCheckIn(nextCheckIn)
+                    if (nextCheckIn && serviceName) {
+                      const duration = resolveServiceDuration(serviceName, serviceOptions) || getServiceDuration(serviceName)
+                      setCheckOut(addMinutesToTime(nextCheckIn, duration))
+                    }
+                  }}
+                  className="w-full bg-slate-50 dark:bg-[#0f1117] border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+                />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">퇴실시간</label>

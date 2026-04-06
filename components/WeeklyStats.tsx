@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Therapist } from '@/lib/types'
 import { formatPrice, toDateString, getServiceCommission, getCustomerType, formatPhone, parseMixedEntries } from '@/lib/utils'
+import { resolveServiceCommission, useStoreServices } from '@/lib/service-config'
+import { useStore } from './StoreProvider'
 
 interface Props {
   initialTherapists: Therapist[]
@@ -54,6 +56,8 @@ function getDayLabel(dateStr: string): string {
 const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일']
 
 export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
+  const { storeId } = useStore()
+  const { serviceOptions } = useStoreServices(storeId)
   const [viewMode, setViewMode] = useState<ViewMode>('week')
   const [weekStart, setWeekStart] = useState(initialWeekStart)
   const [monthStart, setMonthStart] = useState(getThisMonthStart)
@@ -77,8 +81,12 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   }, [])
 
   useEffect(() => {
-    fetchWeekData(periodDates[0], periodDates[periodDates.length - 1])
-  }, [weekStart, monthStart, viewMode, fetchWeekData])
+    const timeoutId = window.setTimeout(() => {
+      fetchWeekData(periodDates[0], periodDates[periodDates.length - 1])
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [fetchWeekData, periodDates, viewMode])
 
   const navigate = (delta: number) => {
     if (viewMode === 'week') {
@@ -175,7 +183,10 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   const commissions = therapists
     .map(t => {
       const tSlots = slots.filter(s => s.therapist_id === t.id)
-      const commission = tSlots.reduce((sum, s) => sum + getServiceCommission(s.service_name), 0)
+      const commission = tSlots.reduce(
+        (sum, s) => sum + (resolveServiceCommission(s.service_name, serviceOptions) || getServiceCommission(s.service_name)),
+        0
+      )
       return { name: t.name, commission, count: tSlots.length }
     })
     .filter(c => c.count > 0)
