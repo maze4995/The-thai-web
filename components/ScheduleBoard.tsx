@@ -23,6 +23,10 @@ interface Props {
   initialDate: string
 }
 
+interface DailySettingsRow {
+  manager: string | null
+}
+
 export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlots, initialDate }: Props) {
   const [date, setDate] = useState(initialDate)
   const [therapists] = useState(initialTherapists)
@@ -62,11 +66,14 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         .select('manager')
         .eq('store_id', storeId)
         .eq('work_date', workDate)
-        .maybeSingle(),
+        .limit(1),
     ])
+
+    const managerRow = (managerRes.data?.[0] ?? null) as DailySettingsRow | null
+
     setAttendance(attendanceRes.data ?? [])
     setSlots(slotsRes.data ?? [])
-    setManager(managerRes.data?.manager ?? '')
+    setManager(managerRow?.manager ?? '')
   }, [storeId])
 
   // On mount, always reset to today's business date

@@ -22,6 +22,11 @@ interface StoreContextValue {
   signOut: () => Promise<void>
 }
 
+interface StoreMemberRow {
+  store_id: string
+  stores: { name: string } | null
+}
+
 const StoreContext = createContext<StoreContextValue>({
   storeId: null,
   storeName: null,
@@ -77,12 +82,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           .select('store_id, stores(name)')
           .eq('user_id', user.id)
           .limit(1)
-          .maybeSingle()
+        const membership = (data?.[0] ?? null) as StoreMemberRow | null
 
-        if (data) {
-          const stores = data.stores as unknown as { name: string } | null
+        if (membership) {
+          const stores = membership.stores
           const nextStoreName = stores?.name ?? null
-          const nextStoreId = data.store_id as string
+          const nextStoreId = membership.store_id
 
           setStoreId(nextStoreId)
           setStoreName(nextStoreName)
