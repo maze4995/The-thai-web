@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Therapist } from '@/lib/types'
 import { formatPrice, toDateString, getServiceCommission, getCustomerType, formatPhone, parseMixedEntries } from '@/lib/utils'
@@ -65,28 +65,43 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   const [therapists] = useState(initialTherapists)
   const [loading, setLoading] = useState(true)
 
-  const weekDates = getWeekDates(weekStart)
-  const monthDates = getMonthDates(monthStart)
-  const periodDates = viewMode === 'week' ? weekDates : monthDates
+  const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart])
+  const monthDates = useMemo(() => getMonthDates(monthStart), [monthStart])
+  const periodDates = useMemo(
+    () => (viewMode === 'week' ? weekDates : monthDates),
+    [monthDates, viewMode, weekDates]
+  )
 
-  const fetchWeekData = useCallback(async (start: string, end: string) => {
+  const fetchPeriodData = useCallback(async (start: string, end: string) => {
+    if (!storeId) {
+      setSlots([])
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     const { data } = await supabase
       .from('schedule_slots')
       .select('*')
+      .eq('store_id', storeId)
       .gte('work_date', start)
       .lte('work_date', end)
+
     setSlots(data ?? [])
     setLoading(false)
-  }, [])
+  }, [storeId])
 
   useEffect(() => {
+    if (periodDates.length === 0) {
+      return
+    }
+
     const timeoutId = window.setTimeout(() => {
-      fetchWeekData(periodDates[0], periodDates[periodDates.length - 1])
+      fetchPeriodData(periodDates[0], periodDates[periodDates.length - 1])
     }, 0)
 
     return () => window.clearTimeout(timeoutId)
-  }, [fetchWeekData, periodDates, viewMode])
+  }, [fetchPeriodData, periodDates])
 
   const navigate = (delta: number) => {
     if (viewMode === 'week') {

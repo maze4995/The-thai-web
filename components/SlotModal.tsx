@@ -174,6 +174,38 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
     if (editingSlot) {
       await supabase.from('schedule_slots').update(payload).eq('id', editingSlot.id)
     } else {
+      // If this reservation already exists in another slot, move/update that slot instead of failing.
+      if (storeId && reservationId) {
+        const { data: existingReservationSlots } = await supabase
+          .from('schedule_slots')
+          .select('id, therapist_id, slot_order')
+          .eq('store_id', storeId)
+          .eq('reservation_id', reservationId)
+          .limit(1)
+
+        const existingReservationSlot = existingReservationSlots?.[0] ?? null
+
+        if (existingReservationSlot) {
+          const { data: therapistSlots } = await supabase
+            .from('schedule_slots')
+            .select('slot_order')
+            .eq('store_id', storeId)
+            .eq('therapist_id', therapistId)
+            .eq('work_date', workDate)
+
+          const maxOrder = (therapistSlots ?? []).reduce((max, s) => Math.max(max, s.slot_order ?? 0), 0)
+
+          await supabase
+            .from('schedule_slots')
+            .update({ ...payload, slot_order: maxOrder + 1 })
+            .eq('id', existingReservationSlot.id)
+
+          setSaving(false)
+          onClose()
+          return
+        }
+      }
+
       // Get next slot_order for this therapist on this date
       const { data: existing } = await supabase
         .from('schedule_slots')
