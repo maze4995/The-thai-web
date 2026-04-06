@@ -152,3 +152,17 @@
 
 - `npx eslint components/ScheduleBoard.tsx`
   - 기존에 있던 `autoAssignReservation` dependency warning 1건만 남아 있다.
+## 2026-04-06 추가
+
+### 예약 자동 슬롯 생성 서버화
+
+- 예약 자동 슬롯 생성 책임을 브라우저 realtime 구독에서 DB 트리거로 옮겼다.
+- [ScheduleBoard.tsx](C:/Users/rlgus/Desktop/workspace/The-thai-web/components/ScheduleBoard.tsx)
+  - `reservations` INSERT 구독 제거
+  - 화면은 `schedule_slots`, `daily_attendance` 변경만 구독
+- [migration_auto_assign_slot.sql](C:/Users/rlgus/Desktop/workspace/The-thai-web/supabase/migration_auto_assign_slot.sql)
+  - `reservations_auto_assign_schedule_slot()` 트리거 함수 추가
+  - 예약 INSERT 또는 주요 필드 UPDATE 시 DB가 직접 자동 슬롯 생성
+- 기대 효과
+  - 여러 탭, 여러 기기, 로컬/배포 환경이 동시에 열려 있어도 자동 슬롯 생성은 DB에서 한 번만 실행
+  - 클라이언트 중복 구독으로 인한 이중 생성 가능성 제거

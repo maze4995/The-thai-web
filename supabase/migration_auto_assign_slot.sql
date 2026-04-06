@@ -11,6 +11,9 @@ DROP FUNCTION IF EXISTS public.auto_assign_schedule_slot(
   UUID, DATE, UUID, UUID, TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER, TIME, TEXT, TEXT, INTEGER
 );
 
+DROP TRIGGER IF EXISTS reservations_auto_assign_schedule_slot ON public.reservations;
+DROP FUNCTION IF EXISTS public.reservations_auto_assign_schedule_slot();
+
 CREATE OR REPLACE FUNCTION public.auto_assign_schedule_slot(
   p_store_id UUID,
   p_work_date DATE,
@@ -148,3 +151,54 @@ REVOKE ALL ON FUNCTION public.auto_assign_schedule_slot(
 GRANT EXECUTE ON FUNCTION public.auto_assign_schedule_slot(
   UUID, DATE, UUID, TEXT, TEXT, TEXT, INTEGER, INTEGER, TIME, TEXT, TEXT
 ) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.reservations_auto_assign_schedule_slot()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_work_date DATE;
+BEGIN
+  IF NEW.store_id IS NULL OR NEW.id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF COALESCE(NEW.status, '') <> '예약확정' THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.reserved_date IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  v_work_date := NEW.reserved_date;
+
+  IF NEW.reserved_time IS NOT NULL AND NEW.reserved_time < TIME '06:00:00' THEN
+    v_work_date := NEW.reserved_date - INTERVAL '1 day';
+  END IF;
+
+  PERFORM public.auto_assign_schedule_slot(
+    NEW.store_id,
+    v_work_date,
+    NEW.id,
+    NEW.customer_name,
+    NEW.customer_phone,
+    NEW.service_name,
+    0,
+    1,
+    NEW.reserved_time,
+    'cash',
+    COALESCE(NEW.memo, '')
+  );
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER reservations_auto_assign_schedule_slot
+AFTER INSERT OR UPDATE OF status, reserved_date, reserved_time, customer_name, customer_phone, service_name, memo
+ON public.reservations
+FOR EACH ROW
+EXECUTE FUNCTION public.reservations_auto_assign_schedule_slot();
