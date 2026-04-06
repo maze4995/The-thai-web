@@ -177,3 +177,4 @@
   - 로그인 화면에 `세션이 만료되었습니다. 다시 로그인해 주세요.` 안내 표시
 - [migration_auto_assign_slot.sql](C:/Users/rlgus/Desktop/workspace/The-thai-web/supabase/migration_auto_assign_slot.sql)
   - 자동 생성 슬롯의 `service_name`을 `service_catalog` 기준으로 코드(`T60`, `A90` 등)로 정규화
+  - 자동 생성 슬롯의 `service_price`도 `service_prices`에서 매장별 가격으로 계산

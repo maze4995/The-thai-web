@@ -160,7 +160,9 @@ SET search_path = public
 AS $$
 DECLARE
   v_work_date DATE;
+  v_service_id UUID;
   v_service_code TEXT;
+  v_service_price INTEGER := 0;
 BEGIN
   IF NEW.store_id IS NULL OR NEW.id IS NULL THEN
     RETURN NEW;
@@ -174,14 +176,46 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  SELECT sc.code
-  INTO v_service_code
+  SELECT sc.id, sc.code
+  INTO v_service_id, v_service_code
   FROM public.service_catalog sc
   WHERE sc.store_id = NEW.store_id
     AND sc.is_active = true
     AND (sc.code = NEW.service_name OR sc.name = NEW.service_name)
   ORDER BY sc.sort_order NULLS LAST, sc.name
   LIMIT 1;
+
+  IF v_service_id IS NOT NULL THEN
+    SELECT sp.amount
+    INTO v_service_price
+    FROM public.service_prices sp
+    LEFT JOIN public.lookup_items li
+      ON li.id = sp.lookup_item_id
+    WHERE sp.store_id = NEW.store_id
+      AND sp.service_id = v_service_id
+      AND sp.is_active = true
+      AND (
+        (NEW.customer_name LIKE '%로드%' AND li.code = 'road_member')
+        OR
+        (NEW.customer_name NOT LIKE '%로드%' AND li.code = 'app_member')
+      )
+    ORDER BY sp.display_order
+    LIMIT 1;
+
+    IF v_service_price IS NULL THEN
+      SELECT sp.amount
+      INTO v_service_price
+      FROM public.service_prices sp
+      LEFT JOIN public.lookup_items li
+        ON li.id = sp.lookup_item_id
+      WHERE sp.store_id = NEW.store_id
+        AND sp.service_id = v_service_id
+        AND sp.is_active = true
+        AND (li.code = 'app_member' OR li.code IS NULL)
+      ORDER BY sp.display_order
+      LIMIT 1;
+    END IF;
+  END IF;
 
   v_work_date := NEW.reserved_date;
 
@@ -196,7 +230,7 @@ BEGIN
     NEW.customer_name,
     NEW.customer_phone,
     COALESCE(v_service_code, NEW.service_name),
-    0,
+    COALESCE(v_service_price, 0),
     1,
     NEW.reserved_time,
     'cash',
