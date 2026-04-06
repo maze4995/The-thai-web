@@ -1,6 +1,15 @@
 -- Auto-assign schedule slots in a stable left-to-right order.
 -- This function is used only for automatic reservation placement.
 -- Manual duplicate reservation_id slots are still allowed elsewhere.
+--
+-- Important:
+-- Older versions of this project created an overloaded function with the same
+-- name but a different argument list. Drop the legacy version first so only
+-- the latest server-side assignment logic remains active.
+
+DROP FUNCTION IF EXISTS public.auto_assign_schedule_slot(
+  UUID, DATE, UUID, UUID, TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER, TIME, TEXT, TEXT, INTEGER
+);
 
 CREATE OR REPLACE FUNCTION public.auto_assign_schedule_slot(
   p_store_id UUID,
