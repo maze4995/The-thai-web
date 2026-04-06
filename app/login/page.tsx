@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { DEFAULT_BRAND_NAME, DEFAULT_PRODUCT_LABEL } from '@/lib/branding'
 
 const STORAGE_EMAIL_KEY = 'login_saved_email'
@@ -22,7 +22,6 @@ function getStoredEmail() {
 
 export default function LoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberEmail, setRememberEmail] = useState(false)
@@ -30,10 +29,13 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(false)
-  const expired = searchParams.get('expired') === '1'
+  const [expired, setExpired] = useState(false)
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
+      const params = new URLSearchParams(window.location.search)
+      setExpired(params.get('expired') === '1')
+
       const savedRemember = getStoredFlag(STORAGE_REMEMBER_KEY)
       const savedAuto = getStoredFlag(STORAGE_AUTO_KEY)
 
