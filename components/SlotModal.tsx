@@ -57,6 +57,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
   const [memo, setMemo] = useState((editingSlot?.memo ?? '').replace(/^복합\[[^\]]*\]\s*/, ''))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const { storeId } = useStore()
   const { serviceOptions } = useStoreServices(storeId)
 
@@ -143,6 +144,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
 
   const handleSave = async () => {
     setSaving(true)
+    setSaveError('')
 
     let finalMemo = memo
     if (paymentType === 'mixed') {
@@ -171,17 +173,34 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
       memo: finalMemo,
     }
 
-    if (editingSlot) {
-      await supabase.from('schedule_slots').update(payload).eq('id', editingSlot.id)
-    } else {
-      // Always create a new slot even if another slot already references the same reservation_id.
-      const { data: existing } = await supabase
-        .from('schedule_slots')
-        .select('slot_order')
-        .eq('therapist_id', therapistId)
-        .eq('work_date', workDate)
-      const maxOrder = (existing ?? []).reduce((max, s) => Math.max(max, s.slot_order ?? 0), 0)
-      await supabase.from('schedule_slots').insert({ ...payload, slot_order: maxOrder + 1 })
+    try {
+      if (editingSlot) {
+        const { error } = await supabase.from('schedule_slots').update(payload).eq('id', editingSlot.id)
+        if (error) throw error
+      } else {
+        // Always create a new slot even if another slot already references the same reservation_id.
+        const { data: existing, error: existingError } = await supabase
+          .from('schedule_slots')
+          .select('slot_order')
+          .eq('therapist_id', therapistId)
+          .eq('work_date', workDate)
+        if (existingError) throw existingError
+
+        const maxOrder = (existing ?? []).reduce((max, s) => Math.max(max, s.slot_order ?? 0), 0)
+        const { error: insertError } = await supabase
+          .from('schedule_slots')
+          .insert({ ...payload, slot_order: maxOrder + 1 })
+        if (insertError) throw insertError
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '슬롯 저장 중 오류가 발생했습니다.'
+      if (message.toLowerCase().includes('duplicate') || message.toLowerCase().includes('unique')) {
+        setSaveError('DB에서 reservation_id 중복을 막고 있습니다. Supabase에 migration_allow_duplicate_reservation_slots.sql 적용이 필요합니다.')
+      } else {
+        setSaveError(message)
+      }
+      setSaving(false)
+      return
     }
 
     setSaving(false)
@@ -501,7 +520,13 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
 
         {/* Footer buttons */}
         {(tab === 'manual' || editingSlot) && (
-          <div className="flex gap-2 px-5 py-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-700">
+            {saveError && (
+              <div className="mb-3 rounded-lg border border-red-800/30 bg-red-900/20 px-3 py-2 text-xs text-red-300">
+                {saveError}
+              </div>
+            )}
+            <div className="flex gap-2">
             {editingSlot && (
               <button
                 onClick={handleDelete}
@@ -521,9 +546,10 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
               onClick={handleSave}
               disabled={saving}
               className="px-5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? '저장 중...' : editingSlot ? '수정' : '저장'}
-            </button>
+              >
+                {saving ? '저장 중...' : editingSlot ? '수정' : '저장'}
+              </button>
+            </div>
           </div>
         )}
       </div>
