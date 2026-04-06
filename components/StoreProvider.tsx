@@ -17,6 +17,7 @@ interface StoreContextValue {
   brandName: string
   userEmail: string | null
   isLoading: boolean
+  authNotice: 'expired' | null
   settings: StoreSettings
   features: StoreFeatures
   signOut: () => Promise<void>
@@ -33,6 +34,7 @@ const StoreContext = createContext<StoreContextValue>({
   brandName: getDefaultStoreSettings().brandName,
   userEmail: null,
   isLoading: true,
+  authNotice: null,
   settings: getDefaultStoreSettings(),
   features: getDefaultStoreFeatures(),
   signOut: async () => {},
@@ -47,6 +49,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [storeName, setStoreName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [authNotice, setAuthNotice] = useState<'expired' | null>(null)
   const [settings, setSettings] = useState<StoreSettings>(getDefaultStoreSettings())
   const [features, setFeatures] = useState<StoreFeatures>(getDefaultStoreFeatures())
   const loadingRef = useRef(false)
@@ -65,6 +68,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const user = session?.user ?? null
 
         if (!user) {
+          if (lastUserIdRef.current) {
+            setAuthNotice('expired')
+          }
           setStoreId(null)
           setStoreName(null)
           setUserEmail(null)
@@ -76,6 +82,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
         lastUserIdRef.current = user.id
         setUserEmail(user.email ?? null)
+        setAuthNotice(null)
 
         const { data } = await supabase
           .from('store_members')
@@ -153,15 +160,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setStoreId(null)
         setStoreName(null)
         setUserEmail(null)
+        setAuthNotice(null)
         setSettings(getDefaultStoreSettings())
         setFeatures(getDefaultStoreFeatures())
         setIsLoading(false)
         lastUserIdRef.current = null
       } else if (event === 'SIGNED_IN') {
+        setAuthNotice(null)
         loadStore()
       } else if (event === 'TOKEN_REFRESHED') {
         const nextUserId = session?.user?.id ?? null
         if (nextUserId && nextUserId !== lastUserIdRef.current) {
+          setAuthNotice(null)
           loadStore()
         }
       }
@@ -183,6 +193,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         brandName: settings.brandName,
         userEmail,
         isLoading,
+        authNotice,
         settings,
         features,
         signOut,

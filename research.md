@@ -166,3 +166,14 @@
 - 기대 효과
   - 여러 탭, 여러 기기, 로컬/배포 환경이 동시에 열려 있어도 자동 슬롯 생성은 DB에서 한 번만 실행
   - 클라이언트 중복 구독으로 인한 이중 생성 가능성 제거
+
+### 세션 만료 안내 및 자동 슬롯 서비스 코드 정규화
+
+- [StoreProvider.tsx](C:/Users/rlgus/Desktop/workspace/The-thai-web/components/StoreProvider.tsx)
+  - 기존 로그인 사용자가 세션 만료로 비로그인 상태가 되면 `authNotice = 'expired'`를 기록
+- [AppShell.tsx](C:/Users/rlgus/Desktop/workspace/The-thai-web/components/AppShell.tsx)
+  - 세션 만료 감지 시 `/login?expired=1`로 이동
+- [login/page.tsx](C:/Users/rlgus/Desktop/workspace/The-thai-web/app/login/page.tsx)
+  - 로그인 화면에 `세션이 만료되었습니다. 다시 로그인해 주세요.` 안내 표시
+- [migration_auto_assign_slot.sql](C:/Users/rlgus/Desktop/workspace/The-thai-web/supabase/migration_auto_assign_slot.sql)
+  - 자동 생성 슬롯의 `service_name`을 `service_catalog` 기준으로 코드(`T60`, `A90` 등)로 정규화

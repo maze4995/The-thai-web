@@ -8,7 +8,7 @@ import { useStore } from './StoreProvider'
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { brandName, settings, features, signOut, userEmail, storeId, isLoading } = useStore()
+  const { brandName, settings, features, signOut, userEmail, storeId, isLoading, authNotice } = useStore()
   const isAuthPage = pathname === '/login' || pathname === '/signup'
   const isOnboardingPage = pathname === '/onboarding'
 
@@ -16,7 +16,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (isLoading) return
 
     if (!userEmail && !isAuthPage) {
-      router.replace('/login')
+      router.replace(authNotice === 'expired' ? '/login?expired=1' : '/login')
       return
     }
 
@@ -28,7 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (userEmail && storeId && isAuthPage) {
       router.replace('/')
     }
-  }, [isAuthPage, isLoading, isOnboardingPage, router, storeId, userEmail])
+  }, [authNotice, isAuthPage, isLoading, isOnboardingPage, router, storeId, userEmail])
 
   if (isAuthPage || isOnboardingPage) {
     return <>{children}</>

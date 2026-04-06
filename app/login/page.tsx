@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { DEFAULT_BRAND_NAME, DEFAULT_PRODUCT_LABEL } from '@/lib/branding'
 
 const STORAGE_EMAIL_KEY = 'login_saved_email'
@@ -22,6 +22,7 @@ function getStoredEmail() {
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberEmail, setRememberEmail] = useState(false)
@@ -29,6 +30,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(false)
+  const expired = searchParams.get('expired') === '1'
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -189,6 +191,12 @@ export default function LoginPage() {
             </div>
 
             {/* Error */}
+            {expired && !error && (
+              <p className="text-xs text-amber-300 text-center bg-amber-900/20 border border-amber-700/30 rounded-lg py-2">
+                세션이 만료되었습니다. 다시 로그인해 주세요.
+              </p>
+            )}
+
             {error && (
               <p className="text-xs text-red-400 text-center bg-red-900/20 border border-red-800/30 rounded-lg py-2">{error}</p>
             )}

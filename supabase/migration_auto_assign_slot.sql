@@ -160,6 +160,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_work_date DATE;
+  v_service_code TEXT;
 BEGIN
   IF NEW.store_id IS NULL OR NEW.id IS NULL THEN
     RETURN NEW;
@@ -173,6 +174,15 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  SELECT sc.code
+  INTO v_service_code
+  FROM public.service_catalog sc
+  WHERE sc.store_id = NEW.store_id
+    AND sc.is_active = true
+    AND (sc.code = NEW.service_name OR sc.name = NEW.service_name)
+  ORDER BY sc.sort_order NULLS LAST, sc.name
+  LIMIT 1;
+
   v_work_date := NEW.reserved_date;
 
   IF NEW.reserved_time IS NOT NULL AND NEW.reserved_time < TIME '06:00:00' THEN
@@ -185,7 +195,7 @@ BEGIN
     NEW.id,
     NEW.customer_name,
     NEW.customer_phone,
-    NEW.service_name,
+    COALESCE(v_service_code, NEW.service_name),
     0,
     1,
     NEW.reserved_time,
