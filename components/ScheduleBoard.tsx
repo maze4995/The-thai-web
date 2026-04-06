@@ -180,24 +180,29 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         .filter(s => s.therapist_id === assignTo.id)
         .reduce((max, s) => Math.max(max, s.slot_order ?? 0), 0)
 
-      await supabase.from('schedule_slots').insert({
-        store_id: currentStoreId,
-        therapist_id: assignTo.id,
-        therapist_name: assignTo.name,
-        work_date: currentDate,
-        reservation_id: reservation.id,
-        customer_name: reservation.customer_name,
-        customer_phone: reservation.customer_phone,
-        service_name: mappedService,
-        service_price: price,
-        room_number: roomNumber,
-        reserved_time: reservation.reserved_time?.slice(0, 5) ?? null,
-        check_in_time: null,
-        check_out_time: null,
-        payment_type: 'cash',
-        memo: combinedMemo,
-        slot_order: maxOrder + 1,
+      const { error } = await supabase.rpc('auto_assign_schedule_slot', {
+        p_store_id: currentStoreId,
+        p_work_date: currentDate,
+        p_reservation_id: reservation.id,
+        p_therapist_id: assignTo.id,
+        p_therapist_name: assignTo.name,
+        p_customer_name: reservation.customer_name,
+        p_customer_phone: reservation.customer_phone,
+        p_service_name: mappedService,
+        p_service_price: price,
+        p_room_number: roomNumber,
+        p_reserved_time: reservation.reserved_time?.slice(0, 5) ?? null,
+        p_payment_type: 'cash',
+        p_memo: combinedMemo,
+        p_slot_order: maxOrder + 1,
       })
+
+      if (error) {
+        throw error
+      }
+    } catch (error) {
+      processedReservationIds.delete(reservation.id)
+      console.error('[AutoAssign] 슬롯 자동 생성 실패:', error)
     } finally {
       assigningLock.current = false
     }
