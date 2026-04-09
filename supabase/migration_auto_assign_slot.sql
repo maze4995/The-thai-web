@@ -163,6 +163,8 @@ DECLARE
   v_service_id UUID;
   v_service_code TEXT;
   v_service_price INTEGER := 0;
+  v_auto_memo TEXT := '';
+  v_combined_memo TEXT := '';
 BEGIN
   IF NEW.store_id IS NULL OR NEW.id IS NULL THEN
     RETURN NEW;
@@ -174,6 +176,24 @@ BEGIN
 
   IF NEW.reserved_date IS NULL THEN
     RETURN NEW;
+  END IF;
+
+  IF NEW.customer_name IS NOT NULL AND NEW.customer_name LIKE '%New%' AND NEW.customer_name LIKE '%로드%' THEN
+    v_auto_memo := '신규로드';
+  ELSIF NEW.customer_name IS NOT NULL AND NEW.customer_name LIKE '%New%' AND NEW.customer_name LIKE '%마통%' THEN
+    v_auto_memo := '마통신규';
+  ELSIF NEW.customer_name IS NOT NULL AND NEW.customer_name LIKE '%New%' AND (NEW.customer_name LIKE '%하이%' OR NEW.customer_name LIKE '%하이타이%') THEN
+    v_auto_memo := '하이신규';
+  ELSIF NEW.customer_name IS NOT NULL AND NEW.customer_name LIKE '%New%' AND NEW.customer_name LIKE '%마맵%' THEN
+    v_auto_memo := '마맵신규';
+  ELSIF NEW.customer_name IS NOT NULL AND NEW.customer_name LIKE '%New%' THEN
+    v_auto_memo := '신규';
+  ELSIF NEW.customer_name IS NOT NULL AND NEW.customer_name LIKE '%로드%' THEN
+    v_auto_memo := '기존로드';
+  END IF;
+
+  IF NEW.customer_name IS NOT NULL AND NEW.customer_name LIKE '%CM%' THEN
+    v_auto_memo := CONCAT_WS(' ', v_auto_memo, 'CM');
   END IF;
 
   SELECT sc.id, sc.code
@@ -223,6 +243,8 @@ BEGIN
     v_work_date := NEW.reserved_date - INTERVAL '1 day';
   END IF;
 
+  v_combined_memo := CONCAT_WS(' ', NULLIF(v_auto_memo, ''), NULLIF(COALESCE(NEW.memo, ''), ''));
+
   PERFORM public.auto_assign_schedule_slot(
     NEW.store_id,
     v_work_date,
@@ -234,7 +256,7 @@ BEGIN
     1,
     NEW.reserved_time,
     'cash',
-    COALESCE(NEW.memo, '')
+    v_combined_memo
   );
 
   RETURN NEW;

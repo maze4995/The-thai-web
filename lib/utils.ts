@@ -26,9 +26,9 @@ export function formatTime(time: string | null): string {
 }
 
 export function getPhoneLastFour(phone: string | null | undefined): string {
-  if (!phone) return '전번X'
+  if (!phone) return '번호X'
   const digits = phone.replace(/\D/g, '')
-  if (!digits) return '전번X'
+  if (!digits) return '번호X'
   return digits.slice(-4)
 }
 
@@ -64,30 +64,31 @@ export const PAYMENT_COLORS: Record<string, string> = {
 }
 
 export interface MixedPaymentEntry {
-  label: string  // '현금', '카드', '이체', '쿠폰'
+  label: string
   amount: number
 }
 
-/** 메모에서 복합결제 항목 파싱. "복합[현금:30000+카드:20000] ..." → [{label:'현금',amount:30000}, ...] */
 export function parseMixedEntries(memo: string): MixedPaymentEntry[] {
-  const m = memo.match(/^복합\[([^\]]+)\]/)
-  if (!m) return []
-  return m[1].split('+').map(part => {
+  const matched = memo.match(/^복합\[([^\]]+)\]/)
+  if (!matched) return []
+
+  return matched[1].split('+').map((part) => {
     const colonIdx = part.lastIndexOf(':')
     if (colonIdx === -1) return { label: part, amount: 0 }
-    return { label: part.slice(0, colonIdx), amount: parseInt(part.slice(colonIdx + 1)) || 0 }
+    return {
+      label: part.slice(0, colonIdx),
+      amount: parseInt(part.slice(colonIdx + 1), 10) || 0,
+    }
   })
 }
 
-/** 메모에서 복합결제 표시용 문자열. "복합[현금:30000+카드:20000] ..." → "현금+카드" */
 export function parseMixedCombo(memo: string): string {
-  return parseMixedEntries(memo).map(e => e.label).join('+')
+  return parseMixedEntries(memo).map((entry) => entry.label).join('+')
 }
 
-/** 복합결제 항목을 메모에 저장 (기존 복합 prefix 교체) */
 export function buildMixedComboMemo(entries: MixedPaymentEntry[], existingMemo: string): string {
   const cleaned = existingMemo.replace(/^복합\[[^\]]*\]\s*/, '').trim()
-  const combo = entries.map(e => `${e.label}:${e.amount}`).join('+')
+  const combo = entries.map((entry) => `${entry.label}:${entry.amount}`).join('+')
   return combo ? `복합[${combo}] ${cleaned}`.trim() : cleaned
 }
 
@@ -100,14 +101,14 @@ export interface ServiceOption {
 }
 
 export const SERVICES: ServiceOption[] = [
-  { name: 'T60',  label: '타이 60분',     price: 40000, duration: 60,  commission: 5000 },
-  { name: 'T90',  label: '타이 90분',     price: 60000, duration: 90,  commission: 7000 },
-  { name: 'A60',  label: '아로마 60분',   price: 50000, duration: 60,  commission: 6000 },
-  { name: 'A90',  label: '아로마 90분',   price: 70000, duration: 90,  commission: 8000 },
-  { name: 'C60',  label: '크림 60분',     price: 60000, duration: 60,  commission: 6000 },
-  { name: 'C90',  label: '크림 90분',     price: 80000, duration: 90,  commission: 8000 },
-  { name: 'S60',  label: '스웨디시 60분', price: 70000, duration: 60,  commission: 7000 },
-  { name: 'S90',  label: '스웨디시 90분', price: 90000, duration: 90,  commission: 9000 },
+  { name: 'T60', label: '타이 60분', price: 40000, duration: 60, commission: 5000 },
+  { name: 'T90', label: '타이 90분', price: 60000, duration: 90, commission: 7000 },
+  { name: 'A60', label: '아로마 60분', price: 50000, duration: 60, commission: 6000 },
+  { name: 'A90', label: '아로마 90분', price: 70000, duration: 90, commission: 8000 },
+  { name: 'C60', label: '크림 60분', price: 60000, duration: 60, commission: 6000 },
+  { name: 'C90', label: '크림 90분', price: 80000, duration: 90, commission: 8000 },
+  { name: 'S60', label: '스웨디시 60분', price: 70000, duration: 60, commission: 7000 },
+  { name: 'S90', label: '스웨디시 90분', price: 90000, duration: 90, commission: 9000 },
 ]
 
 const SERVICE_NAME_MAP: Record<string, string> = {
@@ -126,10 +127,14 @@ export function mapServiceName(name: string): string {
 }
 
 const ROAD_PRICES: Record<string, number> = {
-  T60: 60000, T90: 80000,
-  A60: 70000, A90: 90000,
-  C60: 80000, C90: 100000,
-  S60: 80000, S90: 100000,
+  T60: 60000,
+  T90: 80000,
+  A60: 70000,
+  A90: 90000,
+  C60: 80000,
+  C90: 100000,
+  S60: 80000,
+  S90: 100000,
 }
 
 export function getServicePrice(serviceName: string, customerName: string): number {
@@ -137,14 +142,13 @@ export function getServicePrice(serviceName: string, customerName: string): numb
     const roadPrice = ROAD_PRICES[serviceName]
     if (roadPrice) return roadPrice
   }
-  return SERVICES.find(s => s.name === serviceName)?.price ?? 0
+  return SERVICES.find((service) => service.name === serviceName)?.price ?? 0
 }
 
 export function getServiceCommission(serviceName: string): number {
-  return SERVICES.find(s => s.name === serviceName)?.commission ?? 0
+  return SERVICES.find((service) => service.name === serviceName)?.commission ?? 0
 }
 
-// Room assignment priority by service type
 const SERVICE_ROOM_PRIORITY: Record<string, number[]> = {
   T60: [7, 3, 6],
   T90: [7, 3, 6],
@@ -155,31 +159,25 @@ const SERVICE_ROOM_PRIORITY: Record<string, number[]> = {
 export function getAvailableRoom(serviceName: string, usedRooms: number[]): number {
   const priority = SERVICE_ROOM_PRIORITY[serviceName]
   if (priority) {
-    const available = priority.find(r => !usedRooms.includes(r))
+    const available = priority.find((room) => !usedRooms.includes(room))
     if (available) return available
   }
-  // Default: first available from all rooms
+
   const allRooms = [1, 2, 3, 5, 6, 7]
-  return allRooms.find(r => !usedRooms.includes(r)) ?? 1
+  return allRooms.find((room) => !usedRooms.includes(room)) ?? 1
 }
 
 export function getServiceDuration(serviceName: string): number {
-  const svc = SERVICES.find(s => s.name === serviceName)
-  if (svc) return svc.duration
-  const match = serviceName.match(/(\d+)/)
-  return match ? parseInt(match[1]) : 60
+  const service = SERVICES.find((item) => item.name === serviceName)
+  if (service) return service.duration
+  const matched = serviceName.match(/(\d+)/)
+  return matched ? parseInt(matched[1], 10) : 60
 }
 
-/**
- * Get the business date for a given datetime.
- * Business day runs from 06:00 to next day 05:59.
- * e.g. 2026-03-15 02:00 → business date is 2026-03-14
- */
 export function getBusinessDate(date: Date): string {
-  // Always use KST (UTC+9) regardless of server timezone
   const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
-  const h = kst.getUTCHours()
-  if (h < 6) {
+  const hour = kst.getUTCHours()
+  if (hour < 6) {
     kst.setUTCDate(kst.getUTCDate() - 1)
   }
   const y = kst.getUTCFullYear()
@@ -188,58 +186,43 @@ export function getBusinessDate(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-/**
- * Check if a reservation belongs to a business date.
- * Business day: date 06:00 ~ next day 05:59
- *
- * Converts reservation's date+time into a business date, then compares.
- * If no time: uses reserved_date directly as business date
- * (e.g. 03-21 with no time → business date 03-21, matching if businessDate is 03-21)
- */
-export function isReservationInBusinessDay(reservedDate: string, reservedTime: string | null, businessDate: string): boolean {
+export function isReservationInBusinessDay(
+  reservedDate: string,
+  reservedTime: string | null,
+  businessDate: string
+): boolean {
   if (!reservedTime) {
-    // No time info: treat reserved_date as the business date
     return reservedDate === businessDate
   }
-  // Build a Date from reserved_date + reserved_time and compute its business date
+
   const timeStr = reservedTime.slice(0, 5)
   const [h, m] = timeStr.split(':').map(Number)
-  const dt = new Date(reservedDate + 'T00:00:00')
+  const dt = new Date(`${reservedDate}T00:00:00`)
   dt.setHours(h, m, 0, 0)
-  const resBizDate = getBusinessDate(dt)
-  return resBizDate === businessDate
+  return getBusinessDate(dt) === businessDate
 }
 
-/** Check if customer with 'New' is truly new (visit count is (0)(0)) */
 function isTrulyNew(customerName: string): boolean {
   if (!customerName.includes('New')) return false
-  // If no visit count pattern at all, treat as new
   if (!/\(\d+\)/.test(customerName)) return true
-  // Only truly new if visit count is (0)(0)
   return /\(0\)\s*\(0\)/.test(customerName)
 }
 
-/**
- * Generate auto-memo based on customer name patterns.
- * New is only treated as 신규 when visit count is (0)(0)
- */
 export function getAutoMemo(customerName: string): string {
   const parts: string[] = []
-  const isNew = isTrulyNew(customerName)
-  if (isNew && customerName.includes('마통-New')) parts.push('마통신규')
-  else if (isNew && customerName.includes('하이-New')) parts.push('하이신규')
-  else if (isNew && customerName.includes('마맵-New')) parts.push('마맵신규')
-  else if (isNew && customerName.includes('로드-New')) parts.push('신규로드')
-  else if (isNew) parts.push('신규')
+  const hasNewGrade = customerName.toLowerCase().includes('new')
+
+  if (hasNewGrade && customerName.includes('로드')) parts.push('신규로드')
+  else if (hasNewGrade && customerName.includes('마통')) parts.push('마통신규')
+  else if (hasNewGrade && (customerName.includes('하이') || customerName.includes('하이타이'))) parts.push('하이신규')
+  else if (hasNewGrade && customerName.includes('마맵')) parts.push('마맵신규')
+  else if (hasNewGrade) parts.push('신규')
   else if (customerName.includes('로드')) parts.push('기존로드')
+
   if (customerName.includes('CM')) parts.push('CM')
   return parts.join(' ')
 }
 
-/**
- * Classify customer type for statistics.
- * New is only treated as 신규 when visit count is (0)(0)
- */
 export function getCustomerType(customerName: string): '신규로드' | '기존로드' | '신규' | null {
   const isRoad = customerName.includes('로드')
   const isNew = isTrulyNew(customerName)

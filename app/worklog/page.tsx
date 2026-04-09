@@ -91,7 +91,8 @@ function TextareaField({
 }
 
 export default function WorkLogPage() {
-  const today = getBusinessDate(new Date())
+  const todayRef = useRef(getBusinessDate(new Date()))
+  const today = todayRef.current
   const [dateStr, setDateStr] = useState(today)
   const [log, setLog] = useState<WorkLog>(defaultLog(today))
   const [loading, setLoading] = useState(true)
@@ -99,6 +100,7 @@ export default function WorkLogPage() {
   const [autoSaved, setAutoSaved] = useState(false)
   const { storeId, storeName, features, settings } = useStore()
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstLoad = useRef(true)
   const customerItemsRef = useRef<HTMLDivElement>(null)
 
@@ -199,14 +201,18 @@ export default function WorkLogPage() {
         .select('id')
         .single()
       if (data) {
-        setLog(prev => ({ ...prev, id: data.id }))
+        if (data.id && data.id !== log.id) {
+          setLog(prev => ({ ...prev, id: data.id }))
+        }
         setAutoSaved(true)
-        setTimeout(() => setAutoSaved(false), 1500)
+        if (autoSavedTimer.current) clearTimeout(autoSavedTimer.current)
+        autoSavedTimer.current = setTimeout(() => setAutoSaved(false), 1500)
       }
     }, 300)
 
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+      if (autoSavedTimer.current) clearTimeout(autoSavedTimer.current)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [log])
