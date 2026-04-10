@@ -40,6 +40,7 @@ export interface ScheduleSlot {
 export interface Reservation {
   id: string
   store_id?: string
+  created_at?: string | null
   customer_name: string
   customer_phone: string
   reserved_date: string

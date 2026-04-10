@@ -28,6 +28,18 @@ function parseMixedMethods(memo: string): PaymentType[] {
   return parseMixedEntries(memo).map(e => LABEL_TO_METHOD[e.label]).filter(Boolean) as PaymentType[]
 }
 
+function getReservationSortTime(reservation: Reservation) {
+  if (reservation.created_at) {
+    const createdAt = new Date(reservation.created_at).getTime()
+    if (!Number.isNaN(createdAt)) return createdAt
+  }
+
+  const reservedAt = new Date(`${reservation.reserved_date}T${reservation.reserved_time}`).getTime()
+  if (!Number.isNaN(reservedAt)) return reservedAt
+
+  return 0
+}
+
 export function SlotModal({ therapistId, therapistName, workDate, editingSlot, onClose }: Props) {
   const [tab, setTab] = useState<TabType>(editingSlot ? 'manual' : 'reservation')
   const [reservations, setReservations] = useState<Reservation[]>([])
@@ -88,7 +100,10 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
           .order('reserved_time'),
       ])
       const all = [...(sameDayRes.data ?? []), ...(nextDayRes.data ?? [])]
-      setReservations(all.filter(r => isReservationInBusinessDay(r.reserved_date, r.reserved_time, workDate)))
+      const sortedReservations = all
+        .filter(r => isReservationInBusinessDay(r.reserved_date, r.reserved_time, workDate))
+        .sort((a, b) => getReservationSortTime(b) - getReservationSortTime(a))
+      setReservations(sortedReservations)
       setLoadingRes(false)
     }
     fetchReservations()
