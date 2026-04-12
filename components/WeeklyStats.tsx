@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ScheduleSlot, Therapist } from '@/lib/types'
-import { formatPrice, toDateString, getServiceCommission, getCustomerType, formatPhone, parseMixedEntries } from '@/lib/utils'
+import { formatPrice, toDateString, getServiceCommission, resolveCustomerType, formatPhone, parseMixedEntries } from '@/lib/utils'
 import { resolveServiceCommission, useStoreServices } from '@/lib/service-config'
 import { useStore } from './StoreProvider'
 
@@ -166,7 +166,7 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   const specialCount = specialSlots.length
   const specialRevenue = specialSlots.reduce((sum, s) => sum + s.service_price, 0)
   const smsDiscountSlots = slots.filter(s => isSmsDiscount(s))
-  const resolveType = (s: ScheduleSlot) => !s.customer_phone ? '신규로드' : getCustomerType(s.customer_name)
+  const resolveType = (s: ScheduleSlot) => resolveCustomerType(s.customer_name, s.customer_phone, s.memo ?? '')
   const phonePattern = /^010-\d{4}-\d{4}$/
   const newAllSlots = [
     ...slots.filter(s => resolveType(s) === '신규'),

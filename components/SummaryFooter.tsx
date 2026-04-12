@@ -1,7 +1,7 @@
 'use client'
 
 import { ScheduleSlot, TherapistWithSlots } from '@/lib/types'
-import { formatPrice, getServiceCommission, getCustomerType, parseMixedEntries } from '@/lib/utils'
+import { formatPrice, getServiceCommission, resolveCustomerType, parseMixedEntries } from '@/lib/utils'
 import { resolveServiceCommission, useStoreServices } from '@/lib/service-config'
 import { useStore } from './StoreProvider'
 
@@ -44,7 +44,7 @@ export function SummaryFooter({ slots, therapists, manager }: Props) {
   const couponCount = slots.filter(s => isCoupon(s) || (s.payment_type === 'mixed' && getMixedAmount(s, '쿠폰') > 0)).length
   const totalCustomers = slots.length
 
-  const resolveType = (s: ScheduleSlot) => !s.customer_phone ? '신규로드' : getCustomerType(s.customer_name)
+  const resolveType = (s: ScheduleSlot) => resolveCustomerType(s.customer_name, s.customer_phone, s.memo ?? '')
   const newRoadCount = slots.filter(s => resolveType(s) === '신규로드').length
   const existingRoadCount = slots.filter(s => resolveType(s) === '기존로드').length
   const newCustomerCount = slots.filter(s => resolveType(s) === '신규').length
