@@ -225,9 +225,10 @@ export function getAutoMemo(customerName: string): string {
 
 export function getCustomerType(customerName: string): '신규로드' | '기존로드' | '신규' | null {
   const isRoad = customerName.includes('로드')
-  const isNew = isTrulyNew(customerName)
-  if (isRoad && isNew) return '신규로드'
-  if (isRoad && !isNew) return '기존로드'
+  const hasNewGrade = customerName.includes('New')   // New 등급 여부 (방문횟수 무관)
+  const isNew = isTrulyNew(customerName)             // 순수 신규 (방문횟수 0)
+  if (isRoad && hasNewGrade) return '신규로드'        // New 등급 + 로드 → 무조건 신규로드
+  if (isRoad && !hasNewGrade) return '기존로드'
   if (isNew && !isRoad) return '신규'
   return null
 }
