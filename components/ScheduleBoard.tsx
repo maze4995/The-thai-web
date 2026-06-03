@@ -35,15 +35,31 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const { storeId, storeName, settings, features } = useStore()
   const staffLabel = settings.staffLabel
 
-  const fetchData = useCallback(async (workDate: string) => {
+  const fetchManager = useCallback(async (workDate: string) => {
     if (!storeId) {
-      setAttendance([])
-      setSlots([])
       setManager('')
       return
     }
 
-    const [attendanceRes, slotsRes, managerRes] = await Promise.all([
+    const managerRes = await supabase
+      .from('daily_settings')
+      .select('manager')
+      .eq('store_id', storeId)
+      .eq('work_date', workDate)
+      .limit(1)
+
+    const managerRow = (managerRes.data?.[0] ?? null) as DailySettingsRow | null
+    setManager(managerRow?.manager ?? '')
+  }, [storeId])
+
+  const fetchData = useCallback(async (workDate: string) => {
+    if (!storeId) {
+      setAttendance([])
+      setSlots([])
+      return
+    }
+
+    const [attendanceRes, slotsRes] = await Promise.all([
       supabase
         .from('daily_attendance')
         .select('*')
@@ -54,31 +70,23 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
         .select('*')
         .eq('store_id', storeId)
         .eq('work_date', workDate),
-      supabase
-        .from('daily_settings')
-        .select('manager')
-        .eq('store_id', storeId)
-        .eq('work_date', workDate)
-        .limit(1),
     ])
-
-    const managerRow = (managerRes.data?.[0] ?? null) as DailySettingsRow | null
 
     setAttendance(attendanceRes.data ?? [])
     setSlots(slotsRes.data ?? [])
-    setManager(managerRow?.manager ?? '')
   }, [storeId])
 
   useEffect(() => {
     if (!storeId) return
     const timeoutId = window.setTimeout(() => {
       void fetchData(date)
+      void fetchManager(date)
     }, 0)
 
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [date, fetchData, storeId])
+  }, [date, fetchData, fetchManager, storeId])
 
   useEffect(() => {
     if (!storeId) return
