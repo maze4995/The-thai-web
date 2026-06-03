@@ -122,10 +122,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   }
 
   const saveManager = async (name: string) => {
-    if (!storeId) {
-      alert('[진단] storeId 없음 — 매장 정보가 로드되지 않았습니다.')
-      return
-    }
+    if (!storeId) return
     const previous = manager
     setManager(name)
     setEditingManager(false)
@@ -137,22 +134,8 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     if (error) {
       // 저장 실패 시 낙관적 업데이트를 되돌려 실제 DB 상태와 어긋나지 않게 한다.
       console.error('담당자 저장 실패:', error)
-      alert(`[진단] 저장 실패\nmessage: ${error.message}\ncode: ${error.code}\ndetails: ${error.details ?? ''}\nhint: ${error.hint ?? ''}`)
       setManager(previous)
-      return
     }
-
-    // [진단] 저장 직후 같은 조건으로 다시 읽어 저장/조회 어느 쪽 문제인지 확인
-    const { data, error: readErr } = await supabase
-      .from('daily_settings')
-      .select('manager, work_date, store_id')
-      .eq('store_id', storeId)
-      .eq('work_date', date)
-      .limit(1)
-    alert(
-      `[진단] 저장 성공\nstore_id: ${storeId}\nwork_date(저장시점): ${date}\n` +
-        `다시 읽은 결과: ${JSON.stringify(data)}\n읽기 에러: ${readErr?.message ?? '없음'}`
-    )
   }
 
   const toBizMin = (time: string | null) => {
