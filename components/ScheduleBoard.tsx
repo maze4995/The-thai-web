@@ -30,6 +30,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const [selectedTherapistId, setSelectedTherapistId] = useState<string | null>(null)
   const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
   const [manager, setManager] = useState('')
+  const [managerDraft, setManagerDraft] = useState('')
   const [editingManager, setEditingManager] = useState(false)
   const {} = useTheme()
   const { storeId, storeName, settings, features } = useStore()
@@ -121,11 +122,37 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   }
 
   const saveManager = async (name: string) => {
+    if (!storeId) {
+      alert('[진단] storeId 없음 — 매장 정보가 로드되지 않았습니다.')
+      return
+    }
+    const previous = manager
     setManager(name)
     setEditingManager(false)
-    await supabase
+
+    const { error } = await supabase
       .from('daily_settings')
       .upsert({ store_id: storeId, work_date: date, manager: name }, { onConflict: 'store_id,work_date' })
+
+    if (error) {
+      // 저장 실패 시 낙관적 업데이트를 되돌려 실제 DB 상태와 어긋나지 않게 한다.
+      console.error('담당자 저장 실패:', error)
+      alert(`[진단] 저장 실패\nmessage: ${error.message}\ncode: ${error.code}\ndetails: ${error.details ?? ''}\nhint: ${error.hint ?? ''}`)
+      setManager(previous)
+      return
+    }
+
+    // [진단] 저장 직후 같은 조건으로 다시 읽어 저장/조회 어느 쪽 문제인지 확인
+    const { data, error: readErr } = await supabase
+      .from('daily_settings')
+      .select('manager, work_date, store_id')
+      .eq('store_id', storeId)
+      .eq('work_date', date)
+      .limit(1)
+    alert(
+      `[진단] 저장 성공\nstore_id: ${storeId}\nwork_date(저장시점): ${date}\n` +
+        `다시 읽은 결과: ${JSON.stringify(data)}\n읽기 에러: ${readErr?.message ?? '없음'}`
+    )
   }
 
   const toBizMin = (time: string | null) => {
@@ -324,20 +351,38 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
               {storeName ?? 'The Thai'}
             </h1>
             {editingManager ? (
-              <input
-                autoFocus
-                type="text"
-                defaultValue={manager}
-                placeholder="담당자"
-                onBlur={(e) => saveManager(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveManager((e.target as HTMLInputElement).value)
-                }}
-                className="h-7 w-20 rounded border border-[#D4A574] bg-slate-800 px-2 text-xs text-slate-100 outline-none"
-              />
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  type="text"
+                  value={managerDraft}
+                  placeholder="담당자"
+                  onChange={(e) => setManagerDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveManager(managerDraft)
+                    if (e.key === 'Escape') setEditingManager(false)
+                  }}
+                  className="h-7 w-20 rounded border border-[#D4A574] bg-slate-800 px-2 text-xs text-slate-100 outline-none"
+                />
+                <button
+                  onClick={() => saveManager(managerDraft)}
+                  className="h-7 rounded bg-[#D4A574] px-2 text-xs font-medium text-slate-900 transition-colors hover:bg-[#c2955f]"
+                >
+                  저장
+                </button>
+                <button
+                  onClick={() => setEditingManager(false)}
+                  className="h-7 rounded bg-slate-700/60 px-2 text-xs text-slate-300 transition-colors hover:bg-slate-600"
+                >
+                  취소
+                </button>
+              </div>
             ) : (
               <button
-                onClick={() => setEditingManager(true)}
+                onClick={() => {
+                  setManagerDraft(manager)
+                  setEditingManager(true)
+                }}
                 className="h-7 rounded bg-slate-800/60 px-2 text-xs text-slate-400 transition-colors hover:bg-slate-700"
               >
                 {manager || '담당자'}
