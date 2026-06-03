@@ -121,11 +121,20 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   }
 
   const saveManager = async (name: string) => {
+    if (!storeId) return
+    const previous = manager
     setManager(name)
     setEditingManager(false)
-    await supabase
+
+    const { error } = await supabase
       .from('daily_settings')
       .upsert({ store_id: storeId, work_date: date, manager: name }, { onConflict: 'store_id,work_date' })
+
+    if (error) {
+      // 저장 실패 시 낙관적 업데이트를 되돌려 실제 DB 상태와 어긋나지 않게 한다.
+      console.error('담당자 저장 실패:', error)
+      setManager(previous)
+    }
   }
 
   const toBizMin = (time: string | null) => {
