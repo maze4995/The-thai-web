@@ -30,6 +30,7 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const [selectedTherapistId, setSelectedTherapistId] = useState<string | null>(null)
   const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
   const [manager, setManager] = useState('')
+  const [managerDraft, setManagerDraft] = useState('')
   const [editingManager, setEditingManager] = useState(false)
   const {} = useTheme()
   const { storeId, storeName, settings, features } = useStore()
@@ -350,20 +351,38 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
               {storeName ?? 'The Thai'}
             </h1>
             {editingManager ? (
-              <input
-                autoFocus
-                type="text"
-                defaultValue={manager}
-                placeholder="담당자"
-                onBlur={(e) => saveManager(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveManager((e.target as HTMLInputElement).value)
-                }}
-                className="h-7 w-20 rounded border border-[#D4A574] bg-slate-800 px-2 text-xs text-slate-100 outline-none"
-              />
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  type="text"
+                  value={managerDraft}
+                  placeholder="담당자"
+                  onChange={(e) => setManagerDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveManager(managerDraft)
+                    if (e.key === 'Escape') setEditingManager(false)
+                  }}
+                  className="h-7 w-20 rounded border border-[#D4A574] bg-slate-800 px-2 text-xs text-slate-100 outline-none"
+                />
+                <button
+                  onClick={() => saveManager(managerDraft)}
+                  className="h-7 rounded bg-[#D4A574] px-2 text-xs font-medium text-slate-900 transition-colors hover:bg-[#c2955f]"
+                >
+                  저장
+                </button>
+                <button
+                  onClick={() => setEditingManager(false)}
+                  className="h-7 rounded bg-slate-700/60 px-2 text-xs text-slate-300 transition-colors hover:bg-slate-600"
+                >
+                  취소
+                </button>
+              </div>
             ) : (
               <button
-                onClick={() => setEditingManager(true)}
+                onClick={() => {
+                  setManagerDraft(manager)
+                  setEditingManager(true)
+                }}
                 className="h-7 rounded bg-slate-800/60 px-2 text-xs text-slate-400 transition-colors hover:bg-slate-700"
               >
                 {manager || '담당자'}
