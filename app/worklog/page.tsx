@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useStore } from '@/components/StoreProvider'
 import { getBusinessDate } from '@/lib/utils'
@@ -65,6 +65,36 @@ function SectionTitle({
         {title}
       </h3>
     </div>
+  )
+}
+
+function AutoResizeTextarea({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  const resize = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [])
+  useEffect(resize, [value, resize])
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={1}
+      className="w-full resize-none bg-transparent text-[15px] leading-7 text-slate-800 outline-none placeholder:text-slate-300 dark:text-slate-100 dark:placeholder:text-slate-500"
+    />
   )
 }
 
@@ -431,11 +461,9 @@ export default function WorkLogPage() {
                       <span className="mb-2 block text-sm font-semibold text-slate-600 dark:text-slate-300">
                         {item.label}
                       </span>
-                      <input
-                        type="text"
+                      <AutoResizeTextarea
                         value={log[item.key]}
-                        onChange={e => updateField(item.key, e.target.value)}
-                        className="w-full bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-300 dark:text-slate-100 dark:placeholder:text-slate-500"
+                        onChange={val => updateField(item.key, val)}
                         placeholder={`${item.label} 입력`}
                       />
                     </label>
