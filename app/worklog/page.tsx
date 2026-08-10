@@ -462,7 +462,7 @@ export default function WorkLogPage() {
                     { key: 'customer_handoff' as const, label: '타점 인계' },
                     { key: 'customer_receive' as const, label: '타점 인수' },
                   ].map(item => (
-                    <label
+                    <div
                       key={item.key}
                       className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70"
                     >
@@ -474,7 +474,7 @@ export default function WorkLogPage() {
                         onChange={val => updateField(item.key, val)}
                         placeholder={`${item.label} 입력`}
                       />
-                    </label>
+                    </div>
                   ))}
                 </div>
               </section>
