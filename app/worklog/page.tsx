@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useStore } from '@/components/StoreProvider'
 import { getBusinessDate } from '@/lib/utils'
@@ -78,22 +78,30 @@ function AutoResizeTextarea({
   placeholder?: string
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
-  const resize = useCallback(() => {
+  useEffect(() => {
     const el = ref.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [])
-  useEffect(resize, [value, resize])
+    el.style.height = el.scrollHeight + 'px'
+  }, [value])
 
   return (
     <textarea
       ref={ref}
       value={value}
-      onChange={e => onChange(e.target.value)}
+      onChange={e => {
+        onChange(e.target.value)
+        e.target.style.height = 'auto'
+        e.target.style.height = e.target.scrollHeight + 'px'
+      }}
+      onInput={e => {
+        const el = e.currentTarget
+        el.style.height = 'auto'
+        el.style.height = el.scrollHeight + 'px'
+      }}
       placeholder={placeholder}
       rows={1}
-      className="w-full resize-none bg-transparent text-[15px] leading-7 text-slate-800 outline-none placeholder:text-slate-300 dark:text-slate-100 dark:placeholder:text-slate-500"
+      className="w-full resize-none overflow-hidden bg-transparent text-[15px] leading-7 text-slate-800 outline-none placeholder:text-slate-300 dark:text-slate-100 dark:placeholder:text-slate-500"
     />
   )
 }
