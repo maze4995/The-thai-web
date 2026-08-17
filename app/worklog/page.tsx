@@ -136,11 +136,44 @@ export default function WorkLogPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [autoSaved, setAutoSaved] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteFrom, setDeleteFrom] = useState('')
+  const [deleteTo, setDeleteTo] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteResult, setDeleteResult] = useState<string | null>(null)
   const { storeId, storeName, features, settings } = useStore()
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const autoSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstLoad = useRef(true)
   const customerItemsRef = useRef<HTMLDivElement>(null)
+
+  const handleDeleteRange = async () => {
+    if (!storeId || !deleteFrom || !deleteTo) return
+    if (deleteFrom > deleteTo) {
+      setDeleteResult('시작일이 종료일보다 클 수 없습니다.')
+      return
+    }
+    const confirmMsg = `${deleteFrom} ~ ${deleteTo} 기간의 근무일지를 영구 삭제합니다.\n\n이 작업은 되돌릴 수 없습니다. 삭제하시겠습니까?`
+    if (!window.confirm(confirmMsg)) return
+
+    setDeleting(true)
+    const { count, error } = await supabase
+      .from('work_logs')
+      .delete({ count: 'exact' })
+      .eq('store_id', storeId)
+      .gte('log_date', deleteFrom)
+      .lte('log_date', deleteTo)
+
+    if (error) {
+      setDeleteResult(`삭제 실패: ${error.message}`)
+    } else {
+      setDeleteResult(`${count ?? 0}건의 근무일지가 영구 삭제되었습니다.`)
+      if (dateStr >= deleteFrom && dateStr <= deleteTo) {
+        setLog(defaultLog(dateStr))
+      }
+    }
+    setDeleting(false)
+  }
 
   useEffect(() => {
     let active = true
@@ -366,6 +399,17 @@ export default function WorkLogPage() {
               <span className="text-xs text-emerald-500 font-medium">자동저장됨</span>
             )}
             <button
+              onClick={() => {
+                setDeleteFrom('')
+                setDeleteTo('')
+                setDeleteResult(null)
+                setShowDeleteModal(true)
+              }}
+              className="rounded-full border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:border-red-700/60 dark:bg-slate-800/60 dark:text-red-400 dark:hover:bg-red-900/20"
+            >
+              기간 삭제
+            </button>
+            <button
               onClick={handleSave}
               disabled={saving}
               className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
@@ -532,6 +576,62 @@ export default function WorkLogPage() {
           </div>
         )}
       </main>
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-[#161b27]">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              근무일지 기간 삭제
+            </h3>
+            <p className="mt-2 text-sm text-red-500 dark:text-red-400">
+              선택한 기간의 근무일지가 영구 삭제됩니다. 복구할 수 없습니다.
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">시작일</label>
+                <input
+                  type="date"
+                  value={deleteFrom}
+                  onChange={e => setDeleteFrom(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">종료일</label>
+                <input
+                  type="date"
+                  value={deleteTo}
+                  onChange={e => setDeleteTo(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                />
+              </div>
+            </div>
+
+            {deleteResult && (
+              <p className={`mt-3 text-sm font-medium ${deleteResult.startsWith('삭제 실패') || deleteResult.startsWith('시작일') ? 'text-red-500' : 'text-emerald-500'}`}>
+                {deleteResult}
+              </p>
+            )}
+
+            <div className="mt-6 flex gap-2">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                닫기
+              </button>
+              <button
+                onClick={handleDeleteRange}
+                disabled={deleting || !deleteFrom || !deleteTo}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting ? '삭제 중...' : '영구 삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
