@@ -55,6 +55,65 @@ function getDayLabel(dateStr: string): string {
 
 const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일']
 
+function generateExcelXML(dailyData: { date: string; label: string; total: number; cash: number; card: number; transfer: number; coupon: number; special: number; customers: number }[], periodLabel: string): string {
+  const escapeXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const rows = dailyData.map(d => {
+    const dateLabel = `${d.date} (${d.label})`
+    return `<Row>
+      <Cell><Data ss:Type="String">${escapeXml(dateLabel)}</Data></Cell>
+      <Cell><Data ss:Type="Number">${d.total}</Data></Cell>
+      <Cell><Data ss:Type="Number">${d.cash}</Data></Cell>
+      <Cell><Data ss:Type="Number">${d.card}</Data></Cell>
+      <Cell><Data ss:Type="Number">${d.transfer}</Data></Cell>
+      <Cell><Data ss:Type="Number">${d.coupon}</Data></Cell>
+      <Cell><Data ss:Type="Number">${d.special}</Data></Cell>
+      <Cell><Data ss:Type="Number">${d.customers}</Data></Cell>
+    </Row>`
+  })
+  const totals = dailyData.reduce((acc, d) => ({
+    total: acc.total + d.total, cash: acc.cash + d.cash, card: acc.card + d.card,
+    transfer: acc.transfer + d.transfer, coupon: acc.coupon + d.coupon, special: acc.special + d.special, customers: acc.customers + d.customers,
+  }), { total: 0, cash: 0, card: 0, transfer: 0, coupon: 0, special: 0, customers: 0 })
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>
+  <Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#D4A574" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="Total"><Font ss:Bold="1"/><Interior ss:Color="#E8E8E8" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="Num"><NumberFormat ss:Format="#,##0"/></Style>
+</Styles>
+<Worksheet ss:Name="${escapeXml(periodLabel)}">
+<Table>
+  <Column ss:Width="120"/><Column ss:Width="100"/><Column ss:Width="100"/><Column ss:Width="100"/>
+  <Column ss:Width="100"/><Column ss:Width="60"/><Column ss:Width="60"/><Column ss:Width="60"/>
+  <Row ss:StyleID="Header">
+    <Cell><Data ss:Type="String">날짜</Data></Cell>
+    <Cell><Data ss:Type="String">총매출</Data></Cell>
+    <Cell><Data ss:Type="String">현금</Data></Cell>
+    <Cell><Data ss:Type="String">카드</Data></Cell>
+    <Cell><Data ss:Type="String">이체</Data></Cell>
+    <Cell><Data ss:Type="String">쿠폰</Data></Cell>
+    <Cell><Data ss:Type="String">스페셜</Data></Cell>
+    <Cell><Data ss:Type="String">고객수</Data></Cell>
+  </Row>
+  ${rows.join('\n  ')}
+  <Row ss:StyleID="Total">
+    <Cell><Data ss:Type="String">합계</Data></Cell>
+    <Cell><Data ss:Type="Number">${totals.total}</Data></Cell>
+    <Cell><Data ss:Type="Number">${totals.cash}</Data></Cell>
+    <Cell><Data ss:Type="Number">${totals.card}</Data></Cell>
+    <Cell><Data ss:Type="Number">${totals.transfer}</Data></Cell>
+    <Cell><Data ss:Type="Number">${totals.coupon}</Data></Cell>
+    <Cell><Data ss:Type="Number">${totals.special}</Data></Cell>
+    <Cell><Data ss:Type="Number">${totals.customers}</Data></Cell>
+  </Row>
+</Table>
+</Worksheet>
+</Workbook>`
+}
+
 export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   const { storeId } = useStore()
   const { serviceOptions } = useStoreServices(storeId)
@@ -64,6 +123,15 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   const [slots, setSlots] = useState<ScheduleSlot[]>([])
   const [therapists] = useState(initialTherapists)
   const [loading, setLoading] = useState(true)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteFrom, setDeleteFrom] = useState('')
+  const [deleteTo, setDeleteTo] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteResult, setDeleteResult] = useState<string | null>(null)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportFrom, setExportFrom] = useState('')
+  const [exportTo, setExportTo] = useState('')
+  const [exporting, setExporting] = useState(false)
 
   const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart])
   const monthDates = useMemo(() => getMonthDates(monthStart), [monthStart])
@@ -118,6 +186,94 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
   const goThisWeek = () => {
     const monday = getMonday(toDateString(new Date()))
     setWeekStart(toDateString(monday))
+  }
+
+  const handleDeleteRange = async () => {
+    if (!storeId || !deleteFrom || !deleteTo) return
+    if (deleteFrom > deleteTo) {
+      setDeleteResult('시작일이 종료일보다 클 수 없습니다.')
+      return
+    }
+    const confirmMsg = `${deleteFrom} ~ ${deleteTo} 기간의 매출 데이터를 영구 삭제합니다.\n\n이 작업은 되돌릴 수 없습니다. 삭제하시겠습니까?`
+    if (!window.confirm(confirmMsg)) return
+
+    setDeleting(true)
+    const { count, error } = await supabase
+      .from('schedule_slots')
+      .delete({ count: 'exact' })
+      .eq('store_id', storeId)
+      .gte('work_date', deleteFrom)
+      .lte('work_date', deleteTo)
+
+    if (error) {
+      setDeleteResult(`삭제 실패: ${error.message}`)
+    } else {
+      setDeleteResult(`${count ?? 0}건의 매출 데이터가 영구 삭제되었습니다.`)
+      const start = periodDates[0]
+      const end = periodDates[periodDates.length - 1]
+      fetchPeriodData(start, end)
+    }
+    setDeleting(false)
+  }
+
+  const handleExport = async () => {
+    if (!storeId || !exportFrom || !exportTo) return
+    if (exportFrom > exportTo) return
+
+    setExporting(true)
+    const { data } = await supabase
+      .from('schedule_slots')
+      .select('*')
+      .eq('store_id', storeId)
+      .gte('work_date', exportFrom)
+      .lte('work_date', exportTo)
+      .order('work_date')
+
+    if (!data || data.length === 0) {
+      setExporting(false)
+      return
+    }
+
+    const allDates: string[] = []
+    const d = new Date(exportFrom + 'T00:00:00')
+    const endDate = new Date(exportTo + 'T00:00:00')
+    while (d <= endDate) {
+      allDates.push(toDateString(d))
+      d.setDate(d.getDate() + 1)
+    }
+
+    const exportDailyData = allDates.map(date => {
+      const daySlots = (data as ScheduleSlot[]).filter(s => s.work_date === date)
+      const nonCoupon = daySlots.filter(s => {
+        if (s.payment_type === 'mixed') return true
+        return !((/cm/i).test(s.memo ?? '')) || s.memo?.includes('스페셜')
+      })
+      return {
+        date,
+        label: ['일', '월', '화', '수', '목', '금', '토'][new Date(date + 'T00:00:00').getDay()],
+        total: nonCoupon.reduce((sum, s) => s.payment_type === 'mixed' ? sum + s.service_price - (parseMixedEntries(s.memo ?? '').find(e => e.label === '쿠폰')?.amount ?? 0) : sum + s.service_price, 0),
+        cash: nonCoupon.reduce((sum, s) => s.payment_type === 'cash' ? sum + s.service_price : s.payment_type === 'mixed' ? sum + (parseMixedEntries(s.memo ?? '').find(e => e.label === '현금')?.amount ?? 0) : sum, 0),
+        card: nonCoupon.reduce((sum, s) => s.payment_type === 'card' ? sum + s.service_price : s.payment_type === 'mixed' ? sum + (parseMixedEntries(s.memo ?? '').find(e => e.label === '카드')?.amount ?? 0) : sum, 0),
+        transfer: nonCoupon.reduce((sum, s) => s.payment_type === 'transfer' ? sum + s.service_price : s.payment_type === 'mixed' ? sum + (parseMixedEntries(s.memo ?? '').find(e => e.label === '이체')?.amount ?? 0) : sum, 0),
+        coupon: daySlots.filter(s => (/cm/i).test(s.memo ?? '') || (s.payment_type === 'mixed' && (parseMixedEntries(s.memo ?? '').find(e => e.label === '쿠폰')?.amount ?? 0) > 0)).length,
+        special: daySlots.filter(s => s.memo?.includes('스페셜')).length,
+        customers: daySlots.length,
+      }
+    })
+
+    const label = `${exportFrom} ~ ${exportTo}`
+    const xml = generateExcelXML(exportDailyData, label)
+    const blob = new Blob([xml], { type: 'application/vnd.ms-excel' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `매출_${exportFrom}_${exportTo}.xls`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    setExporting(false)
+    setShowExportModal(false)
   }
 
   const toggleViewMode = () => {
@@ -270,6 +426,27 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
                 {viewMode === 'week' ? '이번주' : '이번달'}
               </button>
             )}
+            <button
+              onClick={() => {
+                setExportFrom(periodDates[0] ?? '')
+                setExportTo(periodDates[periodDates.length - 1] ?? '')
+                setShowExportModal(true)
+              }}
+              className="px-3 h-8 rounded-lg bg-[#1a2035] hover:bg-[#252d40] border border-slate-700/30 text-emerald-400 text-xs font-bold transition-colors"
+            >
+              엑셀 다운로드
+            </button>
+            <button
+              onClick={() => {
+                setDeleteFrom('')
+                setDeleteTo('')
+                setDeleteResult(null)
+                setShowDeleteModal(true)
+              }}
+              className="px-3 h-8 rounded-lg bg-[#1a2035] hover:bg-[#252d40] border border-red-700/40 text-red-400 text-xs font-bold transition-colors"
+            >
+              기간 삭제
+            </button>
           </div>
         </div>
 
@@ -546,6 +723,77 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
           </>
         )}
       </div>
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#161b27] p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-white">매출 데이터 기간 삭제</h3>
+            <p className="mt-2 text-sm text-red-400">
+              선택한 기간의 모든 매출(슬롯) 데이터가 영구 삭제됩니다. 복구할 수 없습니다.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-400">시작일</label>
+                <input type="date" value={deleteFrom} onChange={e => setDeleteFrom(e.target.value)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-red-500" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-400">종료일</label>
+                <input type="date" value={deleteTo} onChange={e => setDeleteTo(e.target.value)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-red-500" />
+              </div>
+            </div>
+            {deleteResult && (
+              <p className={`mt-3 text-sm font-medium ${deleteResult.startsWith('삭제 실패') || deleteResult.startsWith('시작일') ? 'text-red-400' : 'text-emerald-400'}`}>
+                {deleteResult}
+              </p>
+            )}
+            <div className="mt-6 flex gap-2">
+              <button onClick={() => setShowDeleteModal(false)}
+                className="flex-1 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-700 transition">
+                닫기
+              </button>
+              <button onClick={handleDeleteRange} disabled={deleting || !deleteFrom || !deleteTo}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50 transition">
+                {deleting ? '삭제 중...' : '영구 삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#161b27] p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-white">매출 엑셀 다운로드</h3>
+            <p className="mt-2 text-sm text-slate-400">
+              기간을 선택하면 일별 매출 데이터를 엑셀 파일로 다운로드합니다.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-400">시작일</label>
+                <input type="date" value={exportFrom} onChange={e => setExportFrom(e.target.value)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-400">종료일</label>
+                <input type="date" value={exportTo} onChange={e => setExportTo(e.target.value)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500" />
+              </div>
+            </div>
+            <div className="mt-6 flex gap-2">
+              <button onClick={() => setShowExportModal(false)}
+                className="flex-1 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-700 transition">
+                닫기
+              </button>
+              <button onClick={handleExport} disabled={exporting || !exportFrom || !exportTo || exportFrom > exportTo}
+                className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 transition">
+                {exporting ? '생성 중...' : '다운로드'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
