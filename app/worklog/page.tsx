@@ -279,7 +279,7 @@ export default function WorkLogPage() {
         if (autoSavedTimer.current) clearTimeout(autoSavedTimer.current)
         autoSavedTimer.current = setTimeout(() => setAutoSaved(false), 1500)
       }
-    }, 300)
+    }, 3000)
 
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
