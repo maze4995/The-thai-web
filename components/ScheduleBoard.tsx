@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { DailyAttendance, ScheduleSlot, Therapist, TherapistWithSlots } from '@/lib/types'
 import { toDateString, getBusinessDate } from '@/lib/utils'
@@ -89,6 +89,22 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
     }
   }, [date, fetchData, fetchManager, storeId])
 
+  // 실시간 이벤트가 연달아 들어올 때(슬롯 교환, 컬럼 순서 변경 등)
+  // 매번 재조회하지 않고 한 번으로 합친다. — DB 읽기 폭주 방지
+  const dateRef = useRef(date)
+  useEffect(() => {
+    dateRef.current = date
+  }, [date])
+
+  const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleRefetch = useCallback(() => {
+    if (refetchTimer.current) clearTimeout(refetchTimer.current)
+    refetchTimer.current = setTimeout(() => {
+      refetchTimer.current = null
+      void fetchData(dateRef.current)
+    }, 600)
+  }, [fetchData])
+
   useEffect(() => {
     if (!storeId) return
 
@@ -97,23 +113,20 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedule_slots', filter: `store_id=eq.${storeId}` },
-        () => {
-          fetchData(date)
-        }
+        scheduleRefetch
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'daily_attendance', filter: `store_id=eq.${storeId}` },
-        () => {
-          fetchData(date)
-        }
+        scheduleRefetch
       )
       .subscribe()
 
     return () => {
+      if (refetchTimer.current) clearTimeout(refetchTimer.current)
       supabase.removeChannel(channel)
     }
-  }, [date, fetchData, storeId])
+  }, [scheduleRefetch, storeId])
 
   const navigateDate = (delta: number) => {
     const nextDate = new Date(date + 'T00:00:00')

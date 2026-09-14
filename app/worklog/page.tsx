@@ -89,11 +89,7 @@ function AutoResizeTextarea({
     <textarea
       ref={ref}
       value={value}
-      onChange={e => {
-        onChange(e.target.value)
-        e.target.style.height = 'auto'
-        e.target.style.height = e.target.scrollHeight + 'px'
-      }}
+      onChange={e => onChange(e.target.value)}
       onInput={e => {
         const el = e.currentTarget
         el.style.height = 'auto'
@@ -229,6 +225,9 @@ export default function WorkLogPage() {
     }
   }, [dateStr, storeId])
 
+  // 불러온 직후와 항목 추가/삭제 시에만 전체 높이를 맞춘다.
+  // 타이핑 중에는 해당 textarea가 onInput에서 스스로 높이를 조절하므로
+  // 여기서 전체를 재계산하면 글자마다 레이아웃이 강제로 다시 계산돼 휴대폰에서 렉이 걸린다.
   useEffect(() => {
     if (loading) return
     const el = customerItemsRef.current
@@ -237,7 +236,7 @@ export default function WorkLogPage() {
       ta.style.height = 'auto'
       ta.style.height = ta.scrollHeight + 'px'
     })
-  }, [loading, log.customer_items])
+  }, [loading, log.customer_items.length])
 
   useEffect(() => {
     if (loading) return
