@@ -1,68 +1,11 @@
-import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { ScheduleBoard } from '@/components/ScheduleBoard'
-import { getBusinessDate } from '@/lib/utils'
-import { redirect } from 'next/navigation'
 
-export const dynamic = 'force-dynamic'
-
-export default async function HomePage() {
-  const today = getBusinessDate(new Date())
-  const supabase = await createSupabaseServerClient()
-
-  // getUser()는 요청마다 Supabase Auth 서버로 검증 요청을 보내 페이지 전환을 지연시킨다.
-  // getSession()은 쿠키에서 읽으므로 네트워크 왕복이 없다.
-  // 쿠키는 위조될 수 있지만 실제 데이터 접근은 RLS가 JWT를 검증하므로,
-  // 위조된 세션으로는 빈 화면만 보일 뿐 데이터를 읽을 수 없다.
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  const user = session?.user ?? null
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  let storeId: string | null = null
-  const { data: membership } = await supabase
-    .from('store_members')
-    .select('store_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-  storeId = membership?.store_id ?? null
-
-  if (!storeId) {
-    redirect('/onboarding')
-  }
-
-  const [therapistsRes, attendanceRes, slotsRes] = storeId
-    ? await Promise.all([
-        supabase
-          .from('therapists')
-          .select('*')
-          .eq('store_id', storeId)
-          .eq('is_active', true)
-          .order('display_order')
-          .order('name'),
-        supabase
-          .from('daily_attendance')
-          .select('*')
-          .eq('store_id', storeId)
-          .eq('work_date', today),
-        supabase
-          .from('schedule_slots')
-          .select('*')
-          .eq('store_id', storeId)
-          .eq('work_date', today),
-      ])
-    : [{ data: [] }, { data: [] }, { data: [] }]
-
-  return (
-    <ScheduleBoard
-      initialTherapists={therapistsRes.data ?? []}
-      initialAttendance={attendanceRes.data ?? []}
-      initialSlots={slotsRes.data ?? []}
-      initialDate={today}
-    />
-  )
+// 이 페이지는 의도적으로 서버에서 데이터를 가져오지 않는다.
+// 서버 컴포넌트로 두면 전환할 때마다 인증·소속·데이터 조회가 모두 끝나야
+// HTML이 나가기 때문에 페이지 이동이 눈에 띄게 지연됐다.
+// ScheduleBoard 가 마운트 직후 어차피 같은 데이터를 다시 가져오므로
+// 정적으로 내보내고 데이터는 클라이언트에서 채운다.
+// 로그인 확인은 proxy.ts, 매장 소속 확인은 StoreProvider 가 담당한다.
+export default function HomePage() {
+  return <ScheduleBoard />
 }

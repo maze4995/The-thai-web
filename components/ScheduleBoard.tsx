@@ -10,22 +10,15 @@ import { TherapistColumn } from './TherapistColumn'
 import { useStore } from './StoreProvider'
 import { useTheme } from './ThemeProvider'
 
-interface Props {
-  initialTherapists: Therapist[]
-  initialAttendance: DailyAttendance[]
-  initialSlots: ScheduleSlot[]
-  initialDate: string
-}
-
 interface DailySettingsRow {
   manager: string | null
 }
 
-export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlots, initialDate }: Props) {
-  const [date, setDate] = useState(() => initialDate || getBusinessDate(new Date()))
-  const [therapists] = useState(initialTherapists)
-  const [attendance, setAttendance] = useState(initialAttendance)
-  const [slots, setSlots] = useState(initialSlots)
+export function ScheduleBoard() {
+  const [date, setDate] = useState(() => getBusinessDate(new Date()))
+  const [therapists, setTherapists] = useState<Therapist[]>([])
+  const [attendance, setAttendance] = useState<DailyAttendance[]>([])
+  const [slots, setSlots] = useState<ScheduleSlot[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedTherapistId, setSelectedTherapistId] = useState<string | null>(null)
   const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
@@ -35,6 +28,28 @@ export function ScheduleBoard({ initialTherapists, initialAttendance, initialSlo
   const {} = useTheme()
   const { storeId, storeName, settings, features } = useStore()
   const staffLabel = settings.staffLabel
+
+  // 관리사 목록은 날짜와 무관하므로 매장이 정해질 때 한 번만 가져온다.
+  useEffect(() => {
+    if (!storeId) return
+
+    let active = true
+    void (async () => {
+      const { data } = await supabase
+        .from('therapists')
+        .select('*')
+        .eq('store_id', storeId)
+        .eq('is_active', true)
+        .order('display_order')
+        .order('name')
+
+      if (active) setTherapists(data ?? [])
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [storeId])
 
   const fetchManager = useCallback(async (workDate: string) => {
     if (!storeId) {

@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
   StoreFeatures,
@@ -44,7 +45,12 @@ export function useStore() {
   return useContext(StoreContext)
 }
 
+const ONBOARDING_PATH = '/onboarding'
+const AUTH_PATHS = new Set(['/login', '/signup'])
+
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
   const [storeId, setStoreId] = useState<string | null>(null)
   const [storeName, setStoreName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
@@ -179,6 +185,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // 매장 소속이 없는 사용자는 온보딩으로 보낸다.
+  // 예전에는 proxy.ts 와 각 서버 페이지가 하던 일인데, 그 둘 모두
+  // 요청마다 DB를 조회해 페이지 전환을 지연시켜 여기로 옮겼다.
+  // 여기서 처리하면 일부 페이지가 아니라 모든 페이지에 적용된다.
+  useEffect(() => {
+    if (isLoading) return
+    if (!userEmail) return // 미로그인은 proxy.ts 가 /login 으로 보낸다
+    if (storeId) return
+    if (pathname === ONBOARDING_PATH || AUTH_PATHS.has(pathname)) return
+
+    router.replace(ONBOARDING_PATH)
+  }, [isLoading, userEmail, storeId, pathname, router])
 
   const signOut = async () => {
     await supabase.auth.signOut()

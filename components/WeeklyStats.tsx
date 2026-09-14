@@ -7,11 +7,6 @@ import { formatPrice, toDateString, getServiceCommission, resolveCustomerType, f
 import { resolveServiceCommission, useStoreServices } from '@/lib/service-config'
 import { useStore } from './StoreProvider'
 
-interface Props {
-  initialTherapists: Therapist[]
-  initialWeekStart: string
-}
-
 type ViewMode = 'week' | 'month'
 
 function getMonday(dateStr: string): Date {
@@ -114,14 +109,14 @@ function generateExcelXML(dailyData: { date: string; label: string; total: numbe
 </Workbook>`
 }
 
-export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
+export function WeeklyStats() {
   const { storeId } = useStore()
   const { serviceOptions } = useStoreServices(storeId)
   const [viewMode, setViewMode] = useState<ViewMode>('week')
-  const [weekStart, setWeekStart] = useState(initialWeekStart)
+  const [weekStart, setWeekStart] = useState(() => toDateString(getMonday(toDateString(new Date()))))
   const [monthStart, setMonthStart] = useState(getThisMonthStart)
   const [slots, setSlots] = useState<ScheduleSlot[]>([])
-  const [therapists] = useState(initialTherapists)
+  const [therapists, setTherapists] = useState<Therapist[]>([])
   const [loading, setLoading] = useState(true)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteFrom, setDeleteFrom] = useState('')
@@ -139,6 +134,28 @@ export function WeeklyStats({ initialTherapists, initialWeekStart }: Props) {
     () => (viewMode === 'week' ? weekDates : monthDates),
     [monthDates, viewMode, weekDates]
   )
+
+  // 관리사 목록은 기간과 무관하므로 매장이 정해질 때 한 번만 가져온다.
+  useEffect(() => {
+    if (!storeId) return
+
+    let active = true
+    void (async () => {
+      const { data } = await supabase
+        .from('therapists')
+        .select('*')
+        .eq('store_id', storeId)
+        .eq('is_active', true)
+        .order('display_order')
+        .order('name')
+
+      if (active) setTherapists(data ?? [])
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [storeId])
 
   const fetchPeriodData = useCallback(async (start: string, end: string) => {
     if (!storeId) {
