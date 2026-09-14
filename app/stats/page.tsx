@@ -18,9 +18,12 @@ export default async function StatsPage() {
   const weekStart = toDateString(monday)
   const supabase = await createSupabaseServerClient()
 
+  // app/page.tsx 와 동일한 이유로 getUser() 대신 getSession() 을 쓴다.
+  // (요청마다의 Auth 서버 왕복 제거, 데이터 보호는 RLS가 담당)
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+  const user = session?.user ?? null
 
   if (!user) {
     redirect('/login')

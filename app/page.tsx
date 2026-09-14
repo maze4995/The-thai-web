@@ -8,9 +8,15 @@ export const dynamic = 'force-dynamic'
 export default async function HomePage() {
   const today = getBusinessDate(new Date())
   const supabase = await createSupabaseServerClient()
+
+  // getUser()는 요청마다 Supabase Auth 서버로 검증 요청을 보내 페이지 전환을 지연시킨다.
+  // getSession()은 쿠키에서 읽으므로 네트워크 왕복이 없다.
+  // 쿠키는 위조될 수 있지만 실제 데이터 접근은 RLS가 JWT를 검증하므로,
+  // 위조된 세션으로는 빈 화면만 보일 뿐 데이터를 읽을 수 없다.
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+  const user = session?.user ?? null
 
   if (!user) {
     redirect('/login')
