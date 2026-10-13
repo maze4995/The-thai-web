@@ -12,7 +12,7 @@ interface Props {
   therapistName: string
   workDate: string
   editingSlot: ScheduleSlot | null
-  onClose: () => void
+  onClose: (changed?: boolean) => void
 }
 
 type TabType = 'reservation' | 'manual'
@@ -219,16 +219,21 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
     }
 
     setSaving(false)
-    onClose()
+    onClose(true)
   }
 
   const handleDelete = async () => {
     if (!editingSlot) return
     if (!confirm('이 슬롯을 삭제하시겠습니까?')) return
     setDeleting(true)
-    await supabase.from('schedule_slots').delete().eq('id', editingSlot.id)
+    const { error } = await supabase.from('schedule_slots').delete().eq('id', editingSlot.id)
+    if (error) {
+      setSaveError('삭제하지 못했습니다. 다시 시도해 주세요.')
+      setDeleting(false)
+      return
+    }
     setDeleting(false)
-    onClose()
+    onClose(true)
   }
 
   return (
@@ -243,7 +248,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
             <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">{therapistName} · {workDate}</p>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => onClose()}
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl px-2 transition-colors"
           >
             ✕
@@ -552,7 +557,7 @@ export function SlotModal({ therapistId, therapistName, workDate, editingSlot, o
               </button>
             )}
             <button
-              onClick={onClose}
+              onClick={() => onClose()}
               className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors ml-auto"
             >
               취소

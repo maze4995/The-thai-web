@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useStore } from '@/components/StoreProvider'
 import { getBusinessDate } from '@/lib/utils'
+import { LatestSaveQueue } from '@/lib/latest-save-queue'
 
 interface WorkLog {
   id?: string
@@ -19,6 +20,8 @@ interface WorkLog {
   tomorrow_plans: string
   program_feedback: string
 }
+
+type WorkLogPayload = Omit<WorkLog, 'id'> & { store_id: string; updated_at: string }
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -125,22 +128,28 @@ function TextareaField({
 }
 
 export default function WorkLogPage() {
-  const todayRef = useRef(getBusinessDate(new Date()))
-  const today = todayRef.current
+  const [today] = useState(() => getBusinessDate(new Date()))
   const [dateStr, setDateStr] = useState(today)
-  const [log, setLog] = useState<WorkLog>(defaultLog(today))
+  const [log, setLog] = useState<WorkLog>(() => defaultLog(today))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [autoSaved, setAutoSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteFrom, setDeleteFrom] = useState('')
   const [deleteTo, setDeleteTo] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteResult, setDeleteResult] = useState<string | null>(null)
   const { storeId, storeName, features, settings } = useStore()
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const autoSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isFirstLoad = useRef(true)
+  const logRef = useRef(log)
+  const loadedKey = useRef<string | null>(null)
+  const saveVersion = useRef(0)
+  const [saveQueue] = useState(() => new LatestSaveQueue<WorkLogPayload>(async payload => {
+    const { error } = await supabase.from('work_logs')
+      .upsert(payload, { onConflict: 'store_id,log_date' })
+    if (error) throw error
+  }))
   const customerItemsRef = useRef<HTMLDivElement>(null)
 
   const handleDeleteRange = async () => {
@@ -153,6 +162,7 @@ export default function WorkLogPage() {
     if (!window.confirm(confirmMsg)) return
 
     setDeleting(true)
+    await saveQueue.waitForIdle()
     const { count, error } = await supabase
       .from('work_logs')
       .delete({ count: 'exact' })
@@ -165,7 +175,11 @@ export default function WorkLogPage() {
     } else {
       setDeleteResult(`${count ?? 0}건의 근무일지가 영구 삭제되었습니다.`)
       if (dateStr >= deleteFrom && dateStr <= deleteTo) {
-        setLog(defaultLog(dateStr))
+        const empty = defaultLog(dateStr)
+        logRef.current = empty
+        setLog(empty)
+        setAutoSaved(false)
+        setSaveError('')
       }
     }
     setDeleting(false)
@@ -173,8 +187,13 @@ export default function WorkLogPage() {
 
   useEffect(() => {
     let active = true
+    loadedKey.current = null
 
     const load = async () => {
+      setAutoSaved(false)
+      setSaving(false)
+      setSaveError('')
+      setLoadError('')
       if (!storeId) {
         if (!active) return
         setLog(defaultLog(dateStr))
@@ -183,7 +202,9 @@ export default function WorkLogPage() {
       }
 
       setLoading(true)
-      const { data } = await supabase
+      await saveQueue.waitForIdle()
+      if (!active) return
+      const { data, error } = await supabase
         .from('work_logs')
         .select('*')
         .eq('store_id', storeId)
@@ -192,29 +213,32 @@ export default function WorkLogPage() {
 
       if (!active) return
 
-      if (data) {
-        setLog({
-          id: data.id,
-          log_date: data.log_date,
-          hygiene: data.hygiene ?? '',
-          therapist_notes: data.therapist_notes ?? '',
-          customer_items: Array.isArray(data.customer_items)
-            ? data.customer_items
-            : Array(10).fill(''),
-          customer_over: data.customer_over ?? '',
-          customer_handoff: data.customer_handoff ?? '',
-          customer_receive: data.customer_receive ?? '',
-          manager_notes: data.manager_notes ?? '',
-          other_notes: data.other_notes ?? '',
-          memo: data.memo ?? '',
-          tomorrow_plans: data.tomorrow_plans ?? '',
-          program_feedback: data.program_feedback ?? '',
-        })
-      } else {
-        setLog(defaultLog(dateStr))
+      if (error) {
+        setLoadError('업무일지를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.')
+        setLoading(false)
+        return
       }
 
-      isFirstLoad.current = true
+      const nextLog: WorkLog = data ? {
+        id: data.id,
+        log_date: data.log_date,
+        hygiene: data.hygiene ?? '',
+        therapist_notes: data.therapist_notes ?? '',
+        customer_items: Array.isArray(data.customer_items)
+          ? data.customer_items
+          : Array(10).fill(''),
+        customer_over: data.customer_over ?? '',
+        customer_handoff: data.customer_handoff ?? '',
+        customer_receive: data.customer_receive ?? '',
+        manager_notes: data.manager_notes ?? '',
+        other_notes: data.other_notes ?? '',
+        memo: data.memo ?? '',
+        tomorrow_plans: data.tomorrow_plans ?? '',
+        program_feedback: data.program_feedback ?? '',
+      } : defaultLog(dateStr)
+      logRef.current = nextLog
+      setLog(nextLog)
+      loadedKey.current = `${storeId}:${dateStr}`
       setLoading(false)
     }
 
@@ -222,8 +246,9 @@ export default function WorkLogPage() {
 
     return () => {
       active = false
+      loadedKey.current = null
     }
-  }, [dateStr, storeId])
+  }, [dateStr, storeId, saveQueue])
 
   // 불러온 직후와 항목 추가/삭제 시에만 전체 높이를 맞춘다.
   // 타이핑 중에는 해당 textarea가 onInput에서 스스로 높이를 조절하므로
@@ -238,54 +263,29 @@ export default function WorkLogPage() {
     })
   }, [loading, log.customer_items.length])
 
-  useEffect(() => {
-    if (loading) return
-    if (isFirstLoad.current) {
-      isFirstLoad.current = false
-      return
-    }
-    if (!storeId) return
-
+  const saveSnapshot = (snapshot: WorkLog) => {
+    if (!storeId || loadedKey.current !== `${storeId}:${snapshot.log_date}`) return
+    const key = `${storeId}:${snapshot.log_date}`
+    const version = ++saveVersion.current
+    setSaving(true)
     setAutoSaved(false)
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
-    autoSaveTimer.current = setTimeout(async () => {
-      const payload = {
-        store_id: storeId,
-        log_date: dateStr,
-        hygiene: log.hygiene,
-        therapist_notes: log.therapist_notes,
-        customer_items: log.customer_items,
-        customer_over: log.customer_over,
-        customer_handoff: log.customer_handoff,
-        customer_receive: log.customer_receive,
-        manager_notes: log.manager_notes,
-        other_notes: log.other_notes,
-        memo: log.memo,
-        tomorrow_plans: log.tomorrow_plans,
-        program_feedback: log.program_feedback,
-        updated_at: new Date().toISOString(),
-      }
-      const { data } = await supabase
-        .from('work_logs')
-        .upsert(payload, { onConflict: 'store_id,log_date' })
-        .select('id')
-        .single()
-      if (data) {
-        if (data.id && data.id !== log.id) {
-          setLog(prev => ({ ...prev, id: data.id }))
-        }
-        setAutoSaved(true)
-        if (autoSavedTimer.current) clearTimeout(autoSavedTimer.current)
-        autoSavedTimer.current = setTimeout(() => setAutoSaved(false), 1500)
-      }
-    }, 3000)
-
-    return () => {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
-      if (autoSavedTimer.current) clearTimeout(autoSavedTimer.current)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [log])
+    setSaveError('')
+    // The database generates the id; writing it back into form state used to
+    // trigger a redundant autosave. Manual and automatic saves share this path.
+    const { id: _id, ...fields } = snapshot
+    void _id
+    void saveQueue.enqueue(key, {
+      ...fields, store_id: storeId, updated_at: new Date().toISOString(),
+    }).then(() => {
+      if (loadedKey.current !== key || saveVersion.current !== version) return
+      setSaving(false)
+      setAutoSaved(true)
+    }).catch(() => {
+      if (loadedKey.current !== key || saveVersion.current !== version) return
+      setSaving(false)
+      setSaveError('자동저장에 실패했습니다. 입력 내용은 유지됩니다. 저장 버튼으로 다시 시도해 주세요.')
+    })
+  }
 
   const changeDate = (delta: number) => {
     const d = new Date(dateStr)
@@ -294,44 +294,21 @@ export default function WorkLogPage() {
   }
 
   const updateField = <K extends keyof WorkLog>(key: K, value: WorkLog[K]) => {
-    setLog(prev => ({ ...prev, [key]: value }))
+    if (loading || deleting || loadedKey.current !== `${storeId}:${dateStr}`) return
+    const next = { ...logRef.current, [key]: value }
+    logRef.current = next
+    setLog(next)
+    saveSnapshot(next)
   }
 
   const updateCustomerItem = (index: number, value: string) => {
-    const next = [...log.customer_items]
+    const next = [...logRef.current.customer_items]
     next[index] = value
     updateField('customer_items', next)
   }
 
-  const handleSave = async () => {
-    if (!storeId) return
-
-    setSaving(true)
-    const payload = {
-      store_id: storeId,
-      log_date: dateStr,
-      hygiene: log.hygiene,
-      therapist_notes: log.therapist_notes,
-      customer_items: log.customer_items,
-      customer_over: log.customer_over,
-      customer_handoff: log.customer_handoff,
-      customer_receive: log.customer_receive,
-      manager_notes: log.manager_notes,
-      other_notes: log.other_notes,
-      memo: log.memo,
-      tomorrow_plans: log.tomorrow_plans,
-      updated_at: new Date().toISOString(),
-    }
-
-    const { data } = await supabase
-      .from('work_logs')
-      .upsert(payload, { onConflict: 'store_id,log_date' })
-      .select('id')
-      .single()
-
-    if (data) setLog(prev => ({ ...prev, id: data.id }))
-
-    setSaving(false)
+  const handleSave = () => {
+    if (!loading && !deleting) saveSnapshot(logRef.current)
   }
 
   if (!features.worklogEnabled) {
@@ -394,9 +371,9 @@ export default function WorkLogPage() {
               </button>
             )}
 
-            {autoSaved && (
-              <span className="text-xs text-emerald-500 font-medium">자동저장됨</span>
-            )}
+            <span role="status" aria-live="polite" className="text-xs text-emerald-500 font-medium">
+              {saving ? '자동저장 중...' : autoSaved ? '자동저장됨' : ''}
+            </span>
             <button
               onClick={() => {
                 setDeleteFrom('')
@@ -410,7 +387,7 @@ export default function WorkLogPage() {
             </button>
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || loading || deleting || !!loadError || !storeId}
               className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? '저장 중...' : '저장'}
@@ -419,11 +396,15 @@ export default function WorkLogPage() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto mx-auto max-w-6xl w-full px-4 py-6 sm:px-6 sm:py-8">
+      {saveError && <div role="alert" className="px-4 py-2 text-sm text-red-500">{saveError}</div>}
+
+      <main inert={deleting} className="flex-1 overflow-y-auto mx-auto max-w-6xl w-full px-4 py-6 sm:px-6 sm:py-8">
         {loading ? (
           <div className="rounded-[28px] border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm dark:border-slate-700/50 dark:bg-[#161b27] dark:text-slate-400">
             불러오는 중...
           </div>
+        ) : loadError ? (
+          <div role="alert" className="p-6 text-sm text-red-500">{loadError}</div>
         ) : (
           <div className="rounded-[32px] border border-slate-200 bg-white shadow-sm dark:border-slate-700/50 dark:bg-[#161b27]">
             <div className="border-b border-slate-200 px-6 py-6 sm:px-8 dark:border-slate-700/50">

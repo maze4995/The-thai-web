@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { ScheduleSlot, TherapistWithSlots } from '@/lib/types'
 import { formatPrice, getServiceCommission, resolveCustomerType, parseMixedEntries } from '@/lib/utils'
 import { resolveServiceCommission, useStoreServices } from '@/lib/service-config'
@@ -11,7 +12,7 @@ interface Props {
   manager?: string
 }
 
-export function SummaryFooter({ slots, therapists, manager }: Props) {
+export const SummaryFooter = memo(function SummaryFooter({ slots, therapists, manager }: Props) {
   const { storeId } = useStore()
   const { serviceOptions } = useStoreServices(storeId)
   const isSpecial = (s: ScheduleSlot) => s.memo?.includes('스페셜')
@@ -50,7 +51,7 @@ export function SummaryFooter({ slots, therapists, manager }: Props) {
   const newCustomerCount = slots.filter(s => resolveType(s) === '신규').length
 
   const commissions = therapists.map(t => {
-    const therapistSlots = slots.filter(s => s.therapist_id === t.id)
+    const therapistSlots = t.slots
     const commission = therapistSlots.reduce(
       (sum, slot) => sum + (resolveServiceCommission(slot.service_name, serviceOptions) || getServiceCommission(slot.service_name)),
       0
@@ -130,4 +131,4 @@ export function SummaryFooter({ slots, therapists, manager }: Props) {
       </div>
     </footer>
   )
-}
+})

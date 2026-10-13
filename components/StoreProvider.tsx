@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
@@ -59,11 +59,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<StoreSettings>(getDefaultStoreSettings())
   const [features, setFeatures] = useState<StoreFeatures>(getDefaultStoreFeatures())
   const loadingRef = useRef(false)
+  const loadedUserIdRef = useRef<string | null>(null)
   const lastUserIdRef = useRef<string | null>(null)
 
   useEffect(() => {
+    let active = true
+    let version = 0
+    let authTimer: ReturnType<typeof setTimeout> | undefined
     const loadStore = async () => {
       if (loadingRef.current) return
+      const requestVersion = ++version
       loadingRef.current = true
       setIsLoading(true)
 
@@ -71,6 +76,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const {
           data: { session },
         } = await supabase.auth.getSession()
+        if (!active || version !== requestVersion) return
         const user = session?.user ?? null
 
         if (!user) {
@@ -95,6 +101,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           .select('store_id, stores(name)')
           .eq('user_id', user.id)
           .limit(1)
+        if (!active || version !== requestVersion) return
         const membership = (data?.[0] ?? null) as StoreMemberRow | null
 
         if (membership) {
@@ -139,6 +146,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               .maybeSingle(),
           ])
 
+          if (!active || version !== requestVersion) return
           const settingsRow =
             settingsRes.status === 'fulfilled' ? settingsRes.value.data : null
           const featuresRow =
@@ -146,6 +154,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
           setSettings(normalizeStoreSettings(settingsRow, nextStoreName))
           setFeatures(normalizeStoreFeatures(featuresRow))
+          loadedUserIdRef.current = user.id
         } else {
           setStoreId(null)
           setStoreName(null)
@@ -153,16 +162,29 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           setSettings(getDefaultStoreSettings())
           setFeatures(getDefaultStoreFeatures())
         }
+      } catch (error) {
+        if (active && version === requestVersion) console.error('매장 정보 조회 실패:', error)
       } finally {
-        setIsLoading(false)
-        loadingRef.current = false
+        if (active && version === requestVersion) {
+          setIsLoading(false)
+          loadingRef.current = false
+        }
       }
     }
 
-    loadStore()
+    void loadStore()
+    const scheduleLoad = () => {
+      clearTimeout(authTimer)
+      // Supabase auth callbacks must return before issuing further auth/database calls.
+      authTimer = setTimeout(() => { if (active) void loadStore() }, 0)
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
+        ++version
+        clearTimeout(authTimer)
+        loadingRef.current = false
+        loadedUserIdRef.current = null
         setStoreId(null)
         setStoreName(null)
         setUserEmail(null)
@@ -172,18 +194,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false)
         lastUserIdRef.current = null
       } else if (event === 'SIGNED_IN') {
+        const nextUserId = session?.user?.id ?? null
+        // SIGNED_IN also fires when returning to a tab. Keep the board mounted.
+        if (nextUserId && nextUserId === loadedUserIdRef.current) return
+        if (nextUserId !== lastUserIdRef.current) {
+          ++version
+          loadingRef.current = false
+        }
         setAuthNotice(null)
-        loadStore()
+        scheduleLoad()
       } else if (event === 'TOKEN_REFRESHED') {
         const nextUserId = session?.user?.id ?? null
         if (nextUserId && nextUserId !== lastUserIdRef.current) {
           setAuthNotice(null)
-          loadStore()
+          ++version
+          loadingRef.current = false
+          scheduleLoad()
         }
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      active = false
+      ++version
+      loadingRef.current = false
+      clearTimeout(authTimer)
+      subscription.unsubscribe()
+    }
   }, [])
 
   // 매장 소속이 없는 사용자는 온보딩으로 보낸다.
@@ -199,26 +236,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     router.replace(ONBOARDING_PATH)
   }, [isLoading, userEmail, storeId, pathname, router])
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut()
     window.location.href = '/login'
-  }
+  }, [])
 
-  return (
-    <StoreContext.Provider
-      value={{
-        storeId,
-        storeName,
-        brandName: settings.brandName,
-        userEmail,
-        isLoading,
-        authNotice,
-        settings,
-        features,
-        signOut,
-      }}
-    >
-      {children}
-    </StoreContext.Provider>
-  )
+  const value = useMemo(() => ({
+    storeId, storeName, brandName: settings.brandName, userEmail,
+    isLoading, authNotice, settings, features, signOut,
+  }), [storeId, storeName, userEmail, isLoading, authNotice, settings, features, signOut])
+
+  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

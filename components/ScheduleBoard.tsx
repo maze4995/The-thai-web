@@ -1,276 +1,107 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { DailyAttendance, ScheduleSlot, Therapist, TherapistWithSlots } from '@/lib/types'
+import { DailyAttendance, ScheduleSlot, Therapist } from '@/lib/types'
 import { toDateString, getBusinessDate } from '@/lib/utils'
 import { SummaryFooter } from './SummaryFooter'
 import { SlotModal } from './SlotModal'
 import { TherapistColumn } from './TherapistColumn'
 import { useStore } from './StoreProvider'
-import { useTheme } from './ThemeProvider'
+import { useSchedule } from '@/lib/use-schedule'
+import { buildScheduleColumns } from '@/lib/schedule-view'
 
-interface DailySettingsRow {
-  manager: string | null
-}
+const EMPTY_THERAPISTS: Therapist[] = []
+const EMPTY_ATTENDANCE: DailyAttendance[] = []
+const EMPTY_SLOTS: ScheduleSlot[] = []
 
 export function ScheduleBoard() {
+  const { storeId } = useStore()
+  return <ScheduleBoardContent key={storeId ?? 'no-store'} />
+}
+
+function ScheduleBoardContent() {
   const [date, setDate] = useState(() => getBusinessDate(new Date()))
-  const [therapists, setTherapists] = useState<Therapist[]>([])
-  const [attendance, setAttendance] = useState<DailyAttendance[]>([])
-  const [slots, setSlots] = useState<ScheduleSlot[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedTherapistId, setSelectedTherapistId] = useState<string | null>(null)
   const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
-  const [manager, setManager] = useState('')
   const [managerDraft, setManagerDraft] = useState('')
   const [editingManager, setEditingManager] = useState(false)
-  const {} = useTheme()
+  const [actionError, setActionError] = useState('')
   const { storeId, storeName, settings, features } = useStore()
+  const { data, loading, error, refresh, update, read } = useSchedule(storeId, date)
+  const therapists = data?.therapists ?? EMPTY_THERAPISTS
+  const attendance = data?.attendance ?? EMPTY_ATTENDANCE
+  const slots = data?.slots ?? EMPTY_SLOTS
+  const manager = data?.manager ?? ''
   const staffLabel = settings.staffLabel
-
-  // 관리사 목록은 날짜와 무관하므로 매장이 정해질 때 한 번만 가져온다.
-  useEffect(() => {
-    if (!storeId) return
-
-    let active = true
-    void (async () => {
-      const { data } = await supabase
-        .from('therapists')
-        .select('*')
-        .eq('store_id', storeId)
-        .eq('is_active', true)
-        .order('display_order')
-        .order('name')
-
-      if (active) setTherapists(data ?? [])
-    })()
-
-    return () => {
-      active = false
-    }
-  }, [storeId])
-
-  const fetchManager = useCallback(async (workDate: string) => {
-    if (!storeId) {
-      setManager('')
-      return
-    }
-
-    const managerRes = await supabase
-      .from('daily_settings')
-      .select('manager')
-      .eq('store_id', storeId)
-      .eq('work_date', workDate)
-      .limit(1)
-
-    const managerRow = (managerRes.data?.[0] ?? null) as DailySettingsRow | null
-    setManager(managerRow?.manager ?? '')
-  }, [storeId])
-
-  const fetchData = useCallback(async (workDate: string) => {
-    if (!storeId) {
-      setAttendance([])
-      setSlots([])
-      return
-    }
-
-    const [attendanceRes, slotsRes] = await Promise.all([
-      supabase
-        .from('daily_attendance')
-        .select('*')
-        .eq('store_id', storeId)
-        .eq('work_date', workDate),
-      supabase
-        .from('schedule_slots')
-        .select('*')
-        .eq('store_id', storeId)
-        .eq('work_date', workDate),
-    ])
-
-    setAttendance(attendanceRes.data ?? [])
-    setSlots(slotsRes.data ?? [])
-  }, [storeId])
-
-  useEffect(() => {
-    if (!storeId) return
-    const timeoutId = window.setTimeout(() => {
-      void fetchData(date)
-      void fetchManager(date)
-    }, 0)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
-  }, [date, fetchData, fetchManager, storeId])
-
-  // 실시간 이벤트가 연달아 들어올 때(슬롯 교환, 컬럼 순서 변경 등)
-  // 매번 재조회하지 않고 한 번으로 합친다. — DB 읽기 폭주 방지
-  const dateRef = useRef(date)
-  useEffect(() => {
-    dateRef.current = date
-  }, [date])
-
-  const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const scheduleRefetch = useCallback(() => {
-    if (refetchTimer.current) clearTimeout(refetchTimer.current)
-    refetchTimer.current = setTimeout(() => {
-      refetchTimer.current = null
-      void fetchData(dateRef.current)
-    }, 600)
-  }, [fetchData])
-
-  useEffect(() => {
-    if (!storeId) return
-
-    const channel = supabase
-      .channel(`schedule-realtime-${storeId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'schedule_slots', filter: `store_id=eq.${storeId}` },
-        scheduleRefetch
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'daily_attendance', filter: `store_id=eq.${storeId}` },
-        scheduleRefetch
-      )
-      .subscribe()
-
-    return () => {
-      if (refetchTimer.current) clearTimeout(refetchTimer.current)
-      supabase.removeChannel(channel)
-    }
-  }, [scheduleRefetch, storeId])
+  const setSlots = useCallback((updater: (previous: ScheduleSlot[]) => ScheduleSlot[]) => {
+    update(day => ({ ...day, slots: updater(day.slots) }))
+  }, [update])
+  const setAttendance = useCallback((rows: DailyAttendance[]) => {
+    update(day => ({ ...day, attendance: rows }))
+  }, [update])
+  const presentTherapists = useMemo(
+    () => buildScheduleColumns(therapists, attendance, slots),
+    [therapists, attendance, slots],
+  )
 
   const navigateDate = (delta: number) => {
     const nextDate = new Date(date + 'T00:00:00')
     nextDate.setDate(nextDate.getDate() + delta)
+    setEditingManager(false)
+    setActionError('')
     setDate(toDateString(nextDate))
   }
 
   const saveManager = async (name: string) => {
-    if (!storeId) {
-      alert('[진단] storeId 없음 — 매장 정보가 로드되지 않았습니다.')
-      return
-    }
+    if (!storeId || !data) return
     const previous = manager
-    setManager(name)
+    update(day => ({ ...day, manager: name }))
     setEditingManager(false)
-
-    const { error } = await supabase
-      .from('daily_settings')
+    setActionError('')
+    const { error } = await supabase.from('daily_settings')
       .upsert({ store_id: storeId, work_date: date, manager: name }, { onConflict: 'store_id,work_date' })
-
     if (error) {
-      // 저장 실패 시 낙관적 업데이트를 되돌려 실제 DB 상태와 어긋나지 않게 한다.
-      console.error('담당자 저장 실패:', error)
-      alert(`[진단] 저장 실패\nmessage: ${error.message}\ncode: ${error.code}\ndetails: ${error.details ?? ''}\nhint: ${error.hint ?? ''}`)
-      setManager(previous)
-      return
+      update(day => ({ ...day, manager: previous }))
+      setActionError('담당자를 저장하지 못했습니다. 다시 시도해 주세요.')
     }
-
-    // [진단] 저장 직후 같은 조건으로 다시 읽어 저장/조회 어느 쪽 문제인지 확인
-    const { data, error: readErr } = await supabase
-      .from('daily_settings')
-      .select('manager, work_date, store_id')
-      .eq('store_id', storeId)
-      .eq('work_date', date)
-      .limit(1)
-    alert(
-      `[진단] 저장 성공\nstore_id: ${storeId}\nwork_date(저장시점): ${date}\n` +
-        `다시 읽은 결과: ${JSON.stringify(data)}\n읽기 에러: ${readErr?.message ?? '없음'}`
-    )
   }
 
-  const toBizMin = (time: string | null) => {
-    if (!time) return 9999
-    const [hour, minute] = time.slice(0, 5).split(':').map(Number)
-    let value = hour * 60 + minute - 360
-    if (value < 0) value += 1440
-    return value
-  }
-
-  const sortSlots = (slotList: ScheduleSlot[]) =>
-    slotList.sort((a, b) => {
-      const aOrder = a.slot_order ?? toBizMin(a.check_in_time)
-      const bOrder = b.slot_order ?? toBizMin(b.check_in_time)
-      if (aOrder !== bOrder) return aOrder - bOrder
-      return toBizMin(a.check_in_time) - toBizMin(b.check_in_time)
-    })
-
-  const fromTherapists: TherapistWithSlots[] = therapists
-    .map((therapist) => {
-      const att = attendance.find((row) => row.therapist_id === therapist.id)
-      return {
-        ...therapist,
-        display_order: att?.display_order ?? therapist.display_order,
-        is_present: att?.is_present ?? false,
-        attendance_id: att?.id ?? null,
-        slots: sortSlots(slots.filter((slot) => slot.therapist_id === therapist.id)),
-      }
-    })
-    .filter((therapist) => therapist.is_present)
-
-  const knownIds = new Set(therapists.map((therapist) => therapist.id))
-  const orphanTherapistIds = [
-    ...new Set(
-      slots
-        .filter((slot) => slot.therapist_id && !knownIds.has(slot.therapist_id))
-        .map((slot) => slot.therapist_id!)
-    ),
-  ]
-
-  const fromOrphans: TherapistWithSlots[] = orphanTherapistIds.map((id) => {
-    const att = attendance.find((row) => row.therapist_id === id)
-    const therapistSlots = slots.filter((slot) => slot.therapist_id === id)
-    const name = therapistSlots[0]?.therapist_name ?? '(삭제됨)'
-    return {
-      id,
-      name,
-      is_active: false,
-      display_order: att?.display_order ?? 999,
-      store_id: storeId ?? '',
-      is_present: true,
-      attendance_id: att?.id ?? null,
-      slots: sortSlots(therapistSlots),
-    }
-  })
-
-  const presentTherapists: TherapistWithSlots[] = [...fromTherapists, ...fromOrphans].sort(
-    (a, b) => a.display_order - b.display_order
-  )
-
-  const handleAddSlot = (therapistId: string) => {
+  const handleAddSlot = useCallback((therapistId: string) => {
     setSelectedTherapistId(therapistId)
     setEditingSlot(null)
     setModalOpen(true)
-  }
+  }, [])
 
-  const handleEditSlot = (slot: ScheduleSlot) => {
+  const handleEditSlot = useCallback((slot: ScheduleSlot) => {
     setSelectedTherapistId(slot.therapist_id)
     setEditingSlot(slot)
     setModalOpen(true)
-  }
+  }, [])
 
-  const handleModalClose = () => {
+  const handleModalClose = (changed = false) => {
     setModalOpen(false)
     setSelectedTherapistId(null)
     setEditingSlot(null)
-    fetchData(date)
+    if (changed) refresh()
   }
 
-  const handleDropSlot = async (slotId: string, targetTherapistId: string) => {
-    const slot = slots.find((item) => item.id === slotId)
+  const handleDropSlot = useCallback(async (slotId: string, targetTherapistId: string) => {
+    const slot = read()?.slots.find((item) => item.id === slotId)
     if (!slot || slot.therapist_id === targetTherapistId) return
 
     setSlots((prev) => prev.map((item) => (item.id === slotId ? { ...item, therapist_id: targetTherapistId } : item)))
-    await supabase.from('schedule_slots').update({ therapist_id: targetTherapistId }).eq('id', slotId)
-  }
+    const { error } = await supabase.from('schedule_slots').update({ therapist_id: targetTherapistId }).eq('id', slotId).eq('store_id', storeId!)
+    if (error) {
+      setActionError('예약 이동에 실패했습니다. 다시 시도해 주세요.')
+      refresh()
+    }
+  }, [read, setSlots, storeId, refresh])
 
-  const handleSwapSlots = async (draggedSlotId: string, targetSlotId: string) => {
-    const draggedSlot = slots.find((item) => item.id === draggedSlotId)
-    const targetSlot = slots.find((item) => item.id === targetSlotId)
+  const handleSwapSlots = useCallback(async (draggedSlotId: string, targetSlotId: string) => {
+    const draggedSlot = read()?.slots.find((item) => item.id === draggedSlotId)
+    const targetSlot = read()?.slots.find((item) => item.id === targetSlotId)
     if (!draggedSlot || !targetSlot) return
 
     const nextDragged = {
@@ -292,25 +123,29 @@ export function ScheduleBoard() {
       })
     )
 
-    await Promise.all([
+    const results = await Promise.all([
       supabase
         .from('schedule_slots')
         .update({
           therapist_id: nextDragged.therapist_id,
           slot_order: nextDragged.slot_order,
         })
-        .eq('id', draggedSlotId),
+        .eq('id', draggedSlotId).eq('store_id', storeId!),
       supabase
         .from('schedule_slots')
         .update({
           therapist_id: nextTarget.therapist_id,
           slot_order: nextTarget.slot_order,
         })
-        .eq('id', targetSlotId),
+        .eq('id', targetSlotId).eq('store_id', storeId!),
     ])
-  }
+    if (results.some(result => result.error)) {
+      setActionError('예약 교환에 실패했습니다. 다시 시도해 주세요.')
+      refresh()
+    }
+  }, [read, setSlots, storeId, refresh])
 
-  const handleDropColumn = async (draggedId: string, targetId: string, side: 'left' | 'right') => {
+  const handleDropColumn = useCallback(async (draggedId: string, targetId: string, side: 'left' | 'right') => {
     const present = [...presentTherapists].sort((a, b) => a.display_order - b.display_order)
     const draggedIdx = present.findIndex((therapist) => therapist.id === draggedId)
     const targetIdx = present.findIndex((therapist) => therapist.id === targetId)
@@ -334,12 +169,16 @@ export function ScheduleBoard() {
       return old && old.display_order !== row.display_order
     })
 
-    await Promise.all(
+    const results = await Promise.all(
       toUpdate.map((row) =>
-        supabase.from('daily_attendance').update({ display_order: row.display_order }).eq('id', row.id)
+        supabase.from('daily_attendance').update({ display_order: row.display_order }).eq('id', row.id).eq('store_id', storeId!)
       )
     )
-  }
+    if (results.some(result => result.error)) {
+      setActionError('관리사 순서를 저장하지 못했습니다. 다시 시도해 주세요.')
+      refresh()
+    }
+  }, [presentTherapists, attendance, setAttendance, storeId, refresh])
 
   if (!features.scheduleBoardEnabled) {
     return (
@@ -432,7 +271,7 @@ export function ScheduleBoard() {
               <input
                 type="date"
                 value={date}
-                onChange={(e) => e.target.value && setDate(e.target.value)}
+                onChange={(e) => { if (e.target.value) { setDate(e.target.value); setEditingManager(false); setActionError('') } }}
                 className="cursor-pointer border-none bg-transparent text-sm font-semibold text-slate-100 outline-none"
                 style={{ colorScheme: 'dark' }}
               />
@@ -445,12 +284,24 @@ export function ScheduleBoard() {
             </button>
           </div>
 
-          <div />
+          <div className="text-right text-xs text-slate-400" role="status" aria-live="polite">
+            {loading && data ? '갱신 중...' : ''}
+          </div>
         </div>
       </header>
+      {(error || actionError) && (
+        <div role="alert" className="flex shrink-0 items-center justify-between bg-red-950/40 px-4 py-2 text-sm text-red-200">
+          <span>{error || actionError}</span>
+          <button onClick={() => { setActionError(''); refresh() }} className="underline">다시 시도</button>
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto p-3">
-        {presentTherapists.length === 0 ? (
+        {!data ? (
+          <div className="flex h-full items-center justify-center text-slate-400" role="status">
+            {loading ? '조판지를 불러오는 중입니다...' : '조판지를 표시할 수 없습니다.'}
+          </div>
+        ) : presentTherapists.length === 0 ? (
           <div className="flex h-full items-center justify-center text-slate-500">
             <div className="text-center">
               <div className="mb-4 text-5xl">📥</div>
@@ -470,7 +321,7 @@ export function ScheduleBoard() {
                 key={therapist.id}
                 therapist={therapist}
                 workDate={date}
-                onAddSlot={() => handleAddSlot(therapist.id)}
+                onAddSlot={handleAddSlot}
                 onEditSlot={handleEditSlot}
                 onDropSlot={handleDropSlot}
                 onSwapSlots={handleSwapSlots}
@@ -481,7 +332,7 @@ export function ScheduleBoard() {
         )}
       </div>
 
-      <SummaryFooter slots={slots} therapists={presentTherapists} manager={manager} />
+      {data && <SummaryFooter slots={slots} therapists={presentTherapists} manager={manager} />}
 
       {modalOpen && selectedTherapistId && (
         <SlotModal

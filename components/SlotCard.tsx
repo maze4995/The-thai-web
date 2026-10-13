@@ -1,14 +1,17 @@
 'use client'
 
-import { DragEvent, useState, useEffect } from 'react'
+import { DragEvent, memo, useState } from 'react'
 import { ScheduleSlot } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
-import { formatTime, formatPrice, getPhoneLastFour, getServiceDuration, addMinutesToTime, getBusinessDate, PAYMENT_LABELS, PAYMENT_COLORS, parseMixedEntries, getCustomerType } from '@/lib/utils'
+import { formatTime, formatPrice, getPhoneLastFour, getServiceDuration, addMinutesToTime, getBusinessDate, PAYMENT_LABELS, parseMixedEntries } from '@/lib/utils'
+
+import { useScheduleTime } from '@/lib/schedule-clock'
+import { businessMinutes } from '@/lib/schedule-view'
 
 interface Props {
   slot: ScheduleSlot
   workDate: string
-  onClick: () => void
+  onEditSlot: (slot: ScheduleSlot) => void
   onSwapSlot?: (draggedSlotId: string, targetSlotId: string) => void
 }
 
@@ -32,7 +35,7 @@ const PAYMENT_BADGE_COLORS: Record<string, string> = {
   mixed: 'bg-red-500 text-white',
 }
 
-export function SlotCard({ slot, workDate, onClick, onSwapSlot }: Props) {
+export const SlotCard = memo(function SlotCard({ slot, workDate, onEditSlot, onSwapSlot }: Props) {
   const [dropOver, setDropOver] = useState(false)
   const phone = getPhoneLastFour(slot.customer_phone)
   const paymentLabel = (() => {
@@ -51,9 +54,6 @@ export function SlotCard({ slot, workDate, onClick, onSwapSlot }: Props) {
     return phone
   })()
 
-  // Customer type badge
-  const customerType = getCustomerType(slot.customer_name)
-
   // Time range display
   const timeRange = (() => {
     if (slot.check_in_time && slot.check_out_time) {
@@ -65,30 +65,13 @@ export function SlotCard({ slot, workDate, onClick, onSwapSlot }: Props) {
     return ''
   })()
 
-  // Border color: green for normal/finished, yellow for serving (checked in but not finished)
-  const isServing = hasCheckedIn && !false // will be refined by isFinished below
-
-  // Normalize time to business-day minutes (06:00=0, 23:00=1020, 00:00=1080, 05:59=1439)
-  const toBizMin = (h: number, m: number) => { let t = h * 60 + m - 360; if (t < 0) t += 1440; return t }
-
-  // Check if service is finished (check_out_time has passed)
-  const [isFinished, setIsFinished] = useState(false)
-  useEffect(() => {
-    const check = () => {
-      if (!slot.check_in_time || !slot.check_out_time) { setIsFinished(false); return }
-      const now = new Date()
-      const todayBiz = getBusinessDate(now)
-      // Past dates: always finished
-      if (workDate < todayBiz) { setIsFinished(true); return }
-      const nowBiz = toBizMin(now.getHours(), now.getMinutes())
-      const [outH, outM] = slot.check_out_time.slice(0, 5).split(':').map(Number)
-      const outBiz = toBizMin(outH, outM)
-      setIsFinished(nowBiz >= outBiz)
-    }
-    check()
-    const interval = setInterval(check, 30000)
-    return () => clearInterval(interval)
-  }, [slot.check_in_time, slot.check_out_time, workDate])
+  const isFinished = useScheduleTime(now => {
+    if (!slot.check_in_time || !slot.check_out_time) return false
+    const today = getBusinessDate(now)
+    if (workDate < today) return true
+    if (workDate > today) return false
+    return businessMinutes(`${now.getHours()}:${now.getMinutes()}`) >= businessMinutes(slot.check_out_time)
+  })
 
   // Left border color: yellow when serving (checked in, not finished), green otherwise
   const borderColor = (hasCheckedIn && !isFinished) ? 'border-l-yellow-400' : 'border-l-emerald-500'
@@ -156,7 +139,7 @@ export function SlotCard({ slot, workDate, onClick, onSwapSlot }: Props) {
       onDragOver={handleSlotDragOver}
       onDragLeave={handleSlotDragLeave}
       onDrop={handleSlotDrop}
-      onClick={onClick}
+      onClick={() => onEditSlot(slot)}
       className={`w-full text-left rounded-lg p-2 sm:p-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing group border-l-[3px] ${borderColor} ${
         dropOver
           ? 'bg-amber-900/30 ring-1 ring-amber-400/50'
@@ -229,4 +212,4 @@ export function SlotCard({ slot, workDate, onClick, onSwapSlot }: Props) {
       )}
     </div>
   )
-}
+})

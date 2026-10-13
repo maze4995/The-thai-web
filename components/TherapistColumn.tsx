@@ -1,9 +1,11 @@
 'use client'
 
-import { DragEvent, useState } from 'react'
+import { DragEvent, memo, useState } from 'react'
 import { TherapistWithSlots, ScheduleSlot } from '@/lib/types'
 import { SlotCard } from './SlotCard'
 import { getBusinessDate } from '@/lib/utils'
+
+import { useScheduleTime } from '@/lib/schedule-clock'
 
 const MAX_SLOTS = 7
 
@@ -12,14 +14,14 @@ type DropSide = 'left' | 'right' | null
 interface Props {
   therapist: TherapistWithSlots
   workDate: string
-  onAddSlot: () => void
+  onAddSlot: (therapistId: string) => void
   onEditSlot: (slot: ScheduleSlot) => void
   onDropSlot: (slotId: string, therapistId: string) => void
   onSwapSlots: (draggedSlotId: string, targetSlotId: string) => void
   onDropColumn: (draggedId: string, targetId: string, side: 'left' | 'right') => void
 }
 
-export function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, onDropSlot, onSwapSlots, onDropColumn }: Props) {
+export const TherapistColumn = memo(function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, onDropSlot, onSwapSlots, onDropColumn }: Props) {
   const emptyCount = Math.max(0, MAX_SLOTS - therapist.slots.length)
   const [slotOver, setSlotOver] = useState(false)
   const [columnDropSide, setColumnDropSide] = useState<DropSide>(null)
@@ -27,18 +29,15 @@ export function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, on
   // Normalize time to business-day minutes (06:00=0, 23:00=1020, 00:00=1080, 05:59=1439)
   const toBizMin = (h: number, m: number) => { let t = h * 60 + m - 360; if (t < 0) t += 1440; return t }
 
-  // Check if therapist is currently serving a customer (only for today)
-  const now = new Date()
-  const todayBiz = getBusinessDate(now)
-  const isPastDate = workDate < todayBiz
-  const nowBiz = toBizMin(now.getHours(), now.getMinutes())
-  const isServing = !isPastDate && therapist.slots.some(s => {
-    if (!s.check_in_time || !s.check_out_time) return false
-    const [inH, inM] = s.check_in_time.slice(0, 5).split(':').map(Number)
-    const [outH, outM] = s.check_out_time.slice(0, 5).split(':').map(Number)
-    const inBiz = toBizMin(inH, inM)
-    const outBiz = toBizMin(outH, outM)
-    return nowBiz >= inBiz && nowBiz < outBiz
+  const isServing = useScheduleTime(now => {
+    if (workDate !== getBusinessDate(now)) return false
+    const nowBiz = toBizMin(now.getHours(), now.getMinutes())
+    return therapist.slots.some(slot => {
+      if (!slot.check_in_time || !slot.check_out_time) return false
+      const [inH, inM] = slot.check_in_time.slice(0, 5).split(':').map(Number)
+      const [outH, outM] = slot.check_out_time.slice(0, 5).split(':').map(Number)
+      return nowBiz >= toBizMin(inH, inM) && nowBiz < toBizMin(outH, outM)
+    })
   })
 
   // --- Column drag (whole column is draggable via header) ---
@@ -149,7 +148,7 @@ export function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, on
             key={slot.id}
             slot={slot}
             workDate={workDate}
-            onClick={() => onEditSlot(slot)}
+            onEditSlot={onEditSlot}
             onSwapSlot={onSwapSlots}
           />
         ))}
@@ -158,7 +157,7 @@ export function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, on
         {Array.from({ length: emptyCount }).map((_, i) => (
           <button
             key={`empty-${i}`}
-            onClick={onAddSlot}
+            onClick={() => onAddSlot(therapist.id)}
             className="w-full h-[80px] border border-dashed border-slate-700/60 hover:border-emerald-600/60 hover:bg-emerald-900/10 rounded-lg flex flex-col items-center justify-center gap-1 transition-all duration-150"
           >
             <span className="text-[#888] text-xl leading-none">+</span>
@@ -168,4 +167,4 @@ export function TherapistColumn({ therapist, workDate, onAddSlot, onEditSlot, on
       </div>
     </div>
   )
-}
+})
