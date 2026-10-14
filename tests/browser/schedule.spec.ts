@@ -6,7 +6,7 @@ const NEXT = '2026-10-14'
 const storeId = '11111111-1111-1111-1111-111111111111'
 const userId = '22222222-2222-2222-2222-222222222222'
 
-async function fixture(page: Page) {
+async function fixture(page: Page, rejectRealtime = false) {
   const reads = new Map<string, number>()
   const delays = new Map<string, number>()
   const failed = new Set<string>()
@@ -35,7 +35,9 @@ async function fixture(page: Page) {
       if (message.event === 'phx_join') {
         topic = message.topic
         filters = (message.payload.config.postgres_changes ?? []).map((row: { table: string }, id: number) => ({ ...row, id: id + 1 }))
-        ws.send(JSON.stringify([joinRef, ref, topic, 'phx_reply', { status: 'ok', response: { postgres_changes: filters } }]))
+        ws.send(JSON.stringify([joinRef, ref, topic, 'phx_reply', rejectRealtime
+          ? { status: 'error', response: { reason: 'test subscription unavailable' } }
+          : { status: 'ok', response: { postgres_changes: filters } }]))
       } else if (message.event === 'heartbeat') {
         ws.send(JSON.stringify([joinRef, ref, message.topic, 'phx_reply', { status: 'ok', response: {} }]))
       }
@@ -90,14 +92,14 @@ async function fixture(page: Page) {
   }
   return {
     reads, delays, failed, session, emit,
-    insertReservation(date = DATE) {
+    insertReservation(date = DATE, notify = true) {
       const row = { id: 'app-slot-' + date, store_id: storeId, therapist_id: 'staff-one', therapist_name: '테스트관리사',
         work_date: date, reservation_id: 'app-reservation', room_number: 1, slot_order: 2,
         customer_name: '신규예약', customer_phone: '01000000000', reserved_time: '13:00',
         check_in_time: null, check_out_time: null, service_name: 'T60', service_price: 40000,
         payment_type: 'cash', memo: '' }
       insertedSlots.set(date, [row])
-      emit(row, 'INSERT')
+      if (notify) emit(row, 'INSERT')
     },
   }
 }
@@ -206,7 +208,7 @@ test('a committed app reservation displays before slow background rereads finish
   await expect.poll(() => state.reads.get('schedule_slots:' + DATE) ?? 0).toBe(before + 1)
   await page.waitForTimeout(2200)
   await expect(page.getByText('신규예약', { exact: true })).toHaveCount(1)
-  expect(state.reads.get('schedule_slots:' + DATE)).toBe(before + 1)
+  expect(state.reads.get('schedule_slots:' + DATE)).toBeLessThanOrEqual(before + 2)
 })
 
 test('an app reservation updates its cached date without appearing on a different day', async ({ page }) => {
@@ -219,4 +221,44 @@ test('an app reservation updates its cached date without appearing on a differen
   await expect(page.getByText('신규예약', { exact: true })).toHaveCount(0)
   await page.locator('input[type=date]').fill(DATE)
   await expect(page.getByText('신규예약', { exact: true })).toBeVisible({ timeout: 600 })
+})
+
+
+test('a missing realtime notification still displays an app reservation automatically', async ({ page }) => {
+  const state = await fixture(page)
+  const navigations: string[] = []
+  page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations.push(frame.url()) })
+  state.insertReservation(DATE, false)
+  await expect(page.getByText('신규예약', { exact: true })).toBeVisible({ timeout: 6500 })
+  expect(navigations).toEqual([])
+})
+
+test('a rejected realtime subscription still refreshes the selected date automatically', async ({ page }) => {
+  const state = await fixture(page, true)
+  await page.locator('input[type=date]').fill(PREVIOUS)
+  await expect(page.getByText('이전고객', { exact: true })).toBeVisible()
+  const todayReads = state.reads.get('schedule_slots:' + DATE)
+  state.insertReservation(PREVIOUS, false)
+  await expect(page.getByText('신규예약', { exact: true })).toBeVisible({ timeout: 6500 })
+  expect(state.reads.get('schedule_slots:' + DATE)).toBe(todayReads)
+  await expect(page.locator('input[type=date]')).toHaveValue(PREVIOUS)
+})
+
+
+test('fallback polling pauses in a hidden tab and recovers on return', async ({ page }) => {
+  const state = await fixture(page)
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  const before = state.reads.get('schedule_slots:' + DATE)
+  state.insertReservation(DATE, false)
+  await page.waitForTimeout(3500)
+  expect(state.reads.get('schedule_slots:' + DATE)).toBe(before)
+  await expect(page.getByText('신규예약', { exact: true })).toHaveCount(0)
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect(page.getByText('신규예약', { exact: true })).toBeVisible({ timeout: 1500 })
 })

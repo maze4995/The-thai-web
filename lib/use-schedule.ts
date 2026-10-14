@@ -74,6 +74,22 @@ export function useSchedule(storeId: string | null, date: string) {
   useEffect(() => {
     if (!storeId) return
     let active = true
+    let timer: ReturnType<typeof setTimeout>
+    const poll = async () => {
+      // Realtime can silently miss events even after reporting SUBSCRIBED.
+      // Read only the visible day, and wait for completion before scheduling again.
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        await source.cache.revalidate(dateRef.current)
+      }
+      if (active) timer = setTimeout(poll, 3000)
+    }
+    timer = setTimeout(poll, 3000)
+    return () => { active = false; clearTimeout(timer) }
+  }, [source, storeId])
+
+  useEffect(() => {
+    if (!storeId) return
+    let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const refresh = () => {
       if (!active) return
@@ -105,11 +121,13 @@ export function useSchedule(storeId: string | null, date: string) {
       })
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('online', onVisible)
+    window.addEventListener('focus', onVisible)
     return () => {
       active = false
       clearTimeout(timer)
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('online', onVisible)
+      window.removeEventListener('focus', onVisible)
       void supabase.removeChannel(channel)
     }
   }, [source, storeId])

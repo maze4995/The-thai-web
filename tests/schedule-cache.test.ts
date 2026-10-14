@@ -202,3 +202,27 @@ test('incomplete and other-store realtime payloads require a normal reread', asy
   assert.equal(slotFromRealtime('store', { eventType: 'UPDATE', new: { id: 'valid', store_id: 'store' } }), null)
   assert.equal(slotFromRealtime('store', { eventType: 'DELETE', new: full }), null)
 })
+
+
+test('fallback revalidation bypasses a fresh cache and joins slow reads without aborting', async () => {
+  const refreshed = deferred<ScheduleDay>()
+  let calls = 0
+  let signal!: AbortSignal
+  const cache = new ScheduleCache(async (_date, input) => {
+    signal = input
+    return ++calls === 1 ? day('cached') : refreshed.promise
+  })
+  await cache.load('A')
+  const pending = cache.revalidate('A')
+  await tick()
+  assert.equal(calls, 2)
+  assert.equal(cache.getSnapshot('A').data?.manager, 'cached')
+  assert.equal(cache.revalidate('A'), pending)
+  assert.equal(cache.revalidate('A'), pending)
+  assert.equal(signal.aborted, false)
+  refreshed.resolve(day('new reservation'))
+  await pending
+  await tick()
+  assert.equal(calls, 2)
+  assert.equal(cache.getSnapshot('A').data?.manager, 'new reservation')
+})

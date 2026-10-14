@@ -111,6 +111,14 @@ export class ScheduleCache {
     return promise
   }
 
+  // Polling must bypass the date cache without aborting or duplicating a slow read.
+  revalidate(date: string): Promise<void> {
+    const entry = this.entries.get(date)
+    if (entry?.request) return entry.request.promise
+    if (entry) entry.updatedAt = 0
+    return this.load(date)
+  }
+
   applySlot(row: ScheduleSlot) {
     let changed = false
     for (const [date, entry] of this.entries) {
