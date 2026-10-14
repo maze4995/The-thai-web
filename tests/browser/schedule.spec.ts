@@ -11,6 +11,7 @@ async function fixture(page: Page) {
   const delays = new Map<string, number>()
   const failed = new Set<string>()
   const savedSlots = new Map<string, Record<string, unknown>>()
+  const insertedSlots = new Map<string, Record<string, unknown>[]>()
   let socket: WebSocketRoute | undefined
   let topic = ''
   let filters: { id: number; table: string }[] = []
@@ -68,7 +69,7 @@ async function fixture(page: Page) {
       schedule_slots: [{ id: 'slot-' + date, store_id: storeId, therapist_id: 'staff-one', therapist_name: '테스트관리사',
         work_date: date, reservation_id: null, room_number: 1, slot_order: 1, customer_name: names[date] ?? '기타고객',
         customer_phone: '01000000000', reserved_time: '12:00', check_in_time: null, check_out_time: null,
-        service_name: 'T60', service_price: 40000, payment_type: 'cash', memo: '', ...savedSlots.get(date) }],
+        service_name: 'T60', service_price: 40000, payment_type: 'cash', memo: '', ...savedSlots.get(date) }, ...(insertedSlots.get(date) ?? [])],
       reservations: [], service_catalog: [], service_prices: [], lookup_items: [],
     }
     await route.fulfill({ json: data[table] ?? [] })
@@ -78,16 +79,25 @@ async function fixture(page: Page) {
   await expect.poll(() => filters.length).toBe(4)
   // Allow the initial subscribe/fetch reconciliation to settle.
   await page.waitForTimeout(400)
+  const emit = (record: Record<string, unknown> = { id: 'slot-' + DATE, store_id: storeId, work_date: DATE }, eventType = 'UPDATE') => {
+    const filter = filters.find(row => row.table === 'schedule_slots')
+    if (!socket || !filter) throw new Error('Realtime subscription not ready')
+    socket.send(JSON.stringify([null, null, topic, 'postgres_changes', {
+      ids: [filter.id], data: { schema: 'public', table: 'schedule_slots', type: eventType,
+        commit_timestamp: new Date().toISOString(), record,
+        old_record: {}, errors: [], columns: [] },
+    }]))
+  }
   return {
-    reads, delays, failed, session,
-    emit() {
-      const filter = filters.find(row => row.table === 'schedule_slots')
-      if (!socket || !filter) throw new Error('Realtime subscription not ready')
-      socket.send(JSON.stringify([null, null, topic, 'postgres_changes', {
-        ids: [filter.id], data: { schema: 'public', table: 'schedule_slots', type: 'UPDATE',
-          commit_timestamp: new Date().toISOString(), record: { id: 'slot-' + DATE, store_id: storeId, work_date: DATE },
-          old_record: {}, errors: [], columns: [] },
-      }]))
+    reads, delays, failed, session, emit,
+    insertReservation(date = DATE) {
+      const row = { id: 'app-slot-' + date, store_id: storeId, therapist_id: 'staff-one', therapist_name: '테스트관리사',
+        work_date: date, reservation_id: 'app-reservation', room_number: 1, slot_order: 2,
+        customer_name: '신규예약', customer_phone: '01000000000', reserved_time: '13:00',
+        check_in_time: null, check_out_time: null, service_name: 'T60', service_price: 40000,
+        payment_type: 'cash', memo: '' }
+      insertedSlots.set(date, [row])
+      emit(row, 'INSERT')
     },
   }
 }
@@ -182,4 +192,31 @@ test('saving a slot refreshes its day even without a realtime event', async ({ p
   await page.getByRole('button', { name: '수정', exact: true }).click()
   await expect(page.getByText('수정고객', { exact: true })).toBeVisible()
   await expect(page.getByText('현재고객', { exact: true })).toHaveCount(0)
+})
+
+
+test('a committed app reservation displays before slow background rereads finish', async ({ page }) => {
+  const state = await fixture(page)
+  state.delays.set(DATE, 2000)
+  const before = state.reads.get('schedule_slots:' + DATE) ?? 0
+  const started = performance.now()
+  state.insertReservation()
+  await expect(page.getByText('신규예약', { exact: true })).toBeVisible({ timeout: 600 })
+  console.log('Realtime insert:', JSON.stringify({ backgroundReadDelayMs: 2000, eventToVisibleMs: Math.round(performance.now() - started) }))
+  await expect.poll(() => state.reads.get('schedule_slots:' + DATE) ?? 0).toBe(before + 1)
+  await page.waitForTimeout(2200)
+  await expect(page.getByText('신규예약', { exact: true })).toHaveCount(1)
+  expect(state.reads.get('schedule_slots:' + DATE)).toBe(before + 1)
+})
+
+test('an app reservation updates its cached date without appearing on a different day', async ({ page }) => {
+  const state = await fixture(page)
+  await page.locator('input[type=date]').fill(PREVIOUS)
+  await expect(page.getByText('이전고객', { exact: true })).toBeVisible()
+  state.delays.set(DATE, 2000)
+  state.insertReservation()
+  await page.waitForTimeout(250)
+  await expect(page.getByText('신규예약', { exact: true })).toHaveCount(0)
+  await page.locator('input[type=date]').fill(DATE)
+  await expect(page.getByText('신규예약', { exact: true })).toBeVisible({ timeout: 600 })
 })

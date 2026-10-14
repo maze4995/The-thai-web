@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'r
 import { supabase } from './supabase'
 import { EMPTY_SCHEDULE, ScheduleCache } from './schedule-cache'
 import type { Therapist } from './types'
+import { SLOT_COLUMNS, slotFromRealtime } from './schedule-realtime'
 
-export const SLOT_COLUMNS = 'id,store_id,reservation_id,therapist_id,therapist_name,room_number,reserved_time,check_in_time,check_out_time,work_date,payment_type,customer_name,customer_phone,service_name,service_price,memo,slot_order'
+export { SLOT_COLUMNS } from './schedule-realtime'
 
 function createScheduleSource(storeId: string | null) {
   let therapists: Promise<Therapist[]> | undefined
@@ -72,8 +73,10 @@ export function useSchedule(storeId: string | null, date: string) {
 
   useEffect(() => {
     if (!storeId) return
+    let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const refresh = () => {
+      if (!active) return
       source.cache.invalidate()
       if (timer) return
       timer = setTimeout(() => {
@@ -86,7 +89,13 @@ export function useSchedule(storeId: string | null, date: string) {
       if (document.visibilityState === 'visible') refreshTherapists()
     }
     const channel = supabase.channel(`schedule-${storeId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_slots', filter: `store_id=eq.${storeId}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_slots', filter: `store_id=eq.${storeId}` }, payload => {
+        if (!active) return
+        const slot = slotFromRealtime(storeId, payload)
+        if (slot) source.cache.applySlot(slot)
+        // Render the committed event immediately; verify the rest in the background.
+        refresh()
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_attendance', filter: `store_id=eq.${storeId}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_settings', filter: `store_id=eq.${storeId}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'therapists', filter: `store_id=eq.${storeId}` }, refreshTherapists)
@@ -97,6 +106,7 @@ export function useSchedule(storeId: string | null, date: string) {
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('online', onVisible)
     return () => {
+      active = false
       clearTimeout(timer)
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('online', onVisible)

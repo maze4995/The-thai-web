@@ -153,3 +153,52 @@ test('column ordering, absent staff and historical staff match the original boar
   assert.deepEqual(slots.map(row => row.id), ['late', 'old', 'early', 'hidden'])
   assert.ok(businessMinutes('01:00') > businessMinutes('23:00'))
 })
+
+test('realtime rows appear before a pending read ends and survive its stale response', async () => {
+  const stale = deferred<ScheduleDay>()
+  const verified = deferred<ScheduleDay>()
+  let calls = 0
+  let readSignal: AbortSignal | undefined
+  const cache = new ScheduleCache(async (_date, signal) => {
+    ++calls
+    if (calls === 1) return day('initial')
+    if (calls === 2) { readSignal = signal; return stale.promise }
+    return verified.promise
+  })
+  const date = '2026-10-13'
+  await cache.load(date)
+  const pending = cache.load(date, true)
+  await tick()
+  const inserted = slot('new-reservation')
+  cache.applySlot(inserted)
+  assert.deepEqual(cache.getSnapshot(date).data!.slots, [inserted])
+  assert.equal(readSignal?.aborted, false)
+  stale.resolve(day('old response'))
+  await pending
+  assert.deepEqual(cache.getSnapshot(date).data!.slots, [inserted])
+  verified.resolve({ ...day('verified'), slots: [inserted] })
+  await tick()
+  assert.deepEqual(cache.getSnapshot(date).data!.slots, [inserted])
+  assert.equal(calls, 3)
+})
+
+test('realtime updates move slots between cached dates without duplicate cards', async () => {
+  const inserted = slot('move')
+  const cache = new ScheduleCache(async date => ({ ...day(date), slots: date === inserted.work_date ? [inserted] : [] }))
+  await cache.load('2026-10-13')
+  await cache.load('2026-10-14')
+  const moved = { ...inserted, work_date: '2026-10-14' }
+  cache.applySlot(moved)
+  cache.applySlot(moved)
+  assert.equal(cache.getSnapshot('2026-10-13').data!.slots.length, 0)
+  assert.deepEqual(cache.getSnapshot('2026-10-14').data!.slots, [moved])
+})
+
+test('incomplete and other-store realtime payloads require a normal reread', async () => {
+  const { slotFromRealtime } = await import('../lib/schedule-realtime')
+  const full = { ...slot('valid') }
+  assert.deepEqual(slotFromRealtime('store', { eventType: 'INSERT', new: full }), full)
+  assert.equal(slotFromRealtime('other', { eventType: 'INSERT', new: full }), null)
+  assert.equal(slotFromRealtime('store', { eventType: 'UPDATE', new: { id: 'valid', store_id: 'store' } }), null)
+  assert.equal(slotFromRealtime('store', { eventType: 'DELETE', new: full }), null)
+})

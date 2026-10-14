@@ -63,3 +63,5 @@ npm run build
 전체 `npm run lint`에는 변경 전부터 존재한 `app/therapists/page.tsx`와 `components/ThemeProvider.tsx`의 `react-hooks/set-state-in-effect` 오류 2건이 있습니다. 이번 변경 파일의 린트와 타입 검사는 통과했습니다.
 
 업무일지는 입력 후 3초 대기를 제거하고 첫 변경부터 즉시 저장을 시작합니다. 저장 중 추가 입력은 문서별 최신 내용으로 합쳐 순서대로 저장하며, 화면에 저장 중/완료/실패를 표시합니다. 수동 저장도 같은 경로를 사용합니다. 관련 회귀 테스트는 `tests/latest-save-queue.test.ts`와 `tests/browser/worklog.spec.ts`입니다.
+
+앱 예약의 조판지 반영은 Supabase의 완전한 INSERT/UPDATE 슬롯 알림을 받는 즉시 캐시에 반영합니다. 기존 150ms 묶음 재조회는 배경 검증으로 유지하며, 먼저 시작된 조회 응답이 최신 알림을 덮어쓰지 않도록 합니다. 부분 알림·삭제는 기존 재조회로 처리합니다. 알림 전달 전의 DB/Realtime 지연은 별도 측정 대상입니다.

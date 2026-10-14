@@ -16,7 +16,13 @@ interface Entry {
   snapshot: ScheduleSnapshot
   updatedAt: number
   revision: number
-  request?: { controller: AbortController; promise: Promise<void> }
+  request?: { controller: AbortController; promise: Promise<void>; slotChanges: Map<string, ScheduleSlot | null> }
+}
+
+function mergeSlot(slots: ScheduleSlot[], id: string, row: ScheduleSlot | null): ScheduleSlot[] {
+  const index = slots.findIndex(slot => slot.id === id)
+  if (!row) return index < 0 ? slots : slots.filter(slot => slot.id !== id)
+  return index < 0 ? [...slots, row] : slots.map(slot => slot.id === id ? row : slot)
 }
 
 // Retain unchanged row identities so unrelated updates don't render every card.
@@ -78,9 +84,14 @@ export class ScheduleCache {
     const current = entry
     const revision = current.revision
     const controller = new AbortController()
+    const slotChanges = new Map<string, ScheduleSlot | null>()
     current.snapshot = { ...current.snapshot, loading: true, error: null }
     const promise = Promise.resolve().then(() => this.loader(date, controller.signal)).then(data => {
       if (controller.signal.aborted || this.entries.get(date) !== current) return
+      // A read that began before an event must not erase the already displayed row.
+      for (const [id, row] of slotChanges) {
+        data = { ...data, slots: mergeSlot(data.slots, id, row) }
+      }
       current.updatedAt = current.revision === revision ? Date.now() : 0
       current.snapshot = { data: reconcileDay(current.snapshot.data, data), loading: false, error: null }
     }).catch(error => {
@@ -95,9 +106,30 @@ export class ScheduleCache {
       // Changes received during a read need one trailing read, not repeated aborts.
       if (!controller.signal.aborted && current.revision !== revision) void this.load(date)
     })
-    current.request = { controller, promise }
+    current.request = { controller, promise, slotChanges }
     this.emit()
     return promise
+  }
+
+  applySlot(row: ScheduleSlot) {
+    let changed = false
+    for (const [date, entry] of this.entries) {
+      const belongs = date === row.work_date
+      const data = entry.snapshot.data
+      const exists = data?.slots.some(slot => slot.id === row.id)
+      if (!belongs && !exists && !entry.request) continue
+      // Record removals for other dates too: an in-flight read can contain the
+      // slot's previous date even if the current snapshot does not yet have it.
+      entry.request?.slotChanges.set(row.id, belongs ? row : null)
+      entry.updatedAt = 0
+      ++entry.revision
+      if (!data) continue
+      const slots = mergeSlot(data.slots, row.id, belongs ? row : null)
+      if (slots === data.slots) continue
+      entry.snapshot = { ...entry.snapshot, data: { ...data, slots } }
+      changed = true
+    }
+    if (changed) this.emit()
   }
 
   cancel(date: string) {
