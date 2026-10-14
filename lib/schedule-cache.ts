@@ -112,9 +112,12 @@ export class ScheduleCache {
   }
 
   // Polling must bypass the date cache without aborting or duplicating a slow read.
-  revalidate(date: string): Promise<void> {
+  revalidate(date: string, minFreshMs = 0): Promise<void> {
     const entry = this.entries.get(date)
     if (entry?.request) return entry.request.promise
+    // A just-completed event/focus refresh already covers this polling tick.
+    if (entry?.snapshot.data && !entry.snapshot.error &&
+        Date.now() - entry.updatedAt < minFreshMs) return Promise.resolve()
     if (entry) entry.updatedAt = 0
     return this.load(date)
   }

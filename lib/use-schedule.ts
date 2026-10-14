@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { supabase } from './supabase'
 import { EMPTY_SCHEDULE, ScheduleCache } from './schedule-cache'
+import { ScheduleMetadataCache } from './schedule-metadata-cache'
 import type { Therapist } from './types'
 import { SLOT_COLUMNS, slotFromRealtime } from './schedule-realtime'
 
@@ -33,23 +34,31 @@ function createScheduleSource(storeId: string | null) {
     }
     return therapists
   }
-  const cache = new ScheduleCache(async (workDate, signal) => {
-    const [therapistRows, attendance, slots, manager] = await Promise.all([
-      getTherapists(),
+  const metadata = new ScheduleMetadataCache(async (workDate, signal) => {
+    const [attendance, manager] = await Promise.all([
       supabase.from('daily_attendance').select('id,store_id,therapist_id,work_date,is_present,display_order')
-        .eq('store_id', storeId!).eq('work_date', workDate).abortSignal(signal),
-      supabase.from('schedule_slots').select(SLOT_COLUMNS)
         .eq('store_id', storeId!).eq('work_date', workDate).abortSignal(signal),
       supabase.from('daily_settings').select('manager')
         .eq('store_id', storeId!).eq('work_date', workDate).limit(1).abortSignal(signal),
     ])
-    if (attendance.error || slots.error || manager.error) {
+    if (attendance.error || manager.error) {
+      throw new Error('출근·담당자 정보를 불러오지 못했습니다. 다시 시도해 주세요.')
+    }
+    return { attendance: attendance.data ?? [], manager: manager.data?.[0]?.manager ?? '' }
+  })
+  const cache = new ScheduleCache(async (workDate, signal) => {
+    const [therapistRows, dayMetadata, slots] = await Promise.all([
+      getTherapists(),
+      metadata.load(workDate, signal),
+      supabase.from('schedule_slots').select(SLOT_COLUMNS)
+        .eq('store_id', storeId!).eq('work_date', workDate).abortSignal(signal),
+    ])
+    if (slots.error) {
       throw new Error('조판지를 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.')
     }
-    return { therapists: therapistRows, attendance: attendance.data ?? [],
-      slots: slots.data ?? [], manager: manager.data?.[0]?.manager ?? '' }
+    return { therapists: therapistRows, ...dayMetadata, slots: slots.data ?? [] }
   })
-  return { cache, resetTherapists }
+  return { cache, metadata, resetTherapists }
 }
 
 export function useSchedule(storeId: string | null, date: string) {
@@ -68,6 +77,7 @@ export function useSchedule(storeId: string | null, date: string) {
 
   useEffect(() => () => {
     source.resetTherapists()
+    source.metadata.invalidate()
     source.cache.dispose()
   }, [source])
 
@@ -79,7 +89,7 @@ export function useSchedule(storeId: string | null, date: string) {
       // Realtime can silently miss events even after reporting SUBSCRIBED.
       // Read only the visible day, and wait for completion before scheduling again.
       if (document.visibilityState === 'visible' && navigator.onLine) {
-        await source.cache.revalidate(dateRef.current)
+        await source.cache.revalidate(dateRef.current, 250)
       }
       if (active) timer = setTimeout(poll, 3000)
     }
@@ -91,16 +101,27 @@ export function useSchedule(storeId: string | null, date: string) {
     if (!storeId) return
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
+    let resetTherapists = false
     const refresh = () => {
       if (!active) return
       source.cache.invalidate()
       if (timer) return
       timer = setTimeout(() => {
         timer = undefined
+        if (resetTherapists) { source.resetTherapists(); resetTherapists = false }
         if (document.visibilityState === 'visible') void source.cache.load(dateRef.current)
       }, 150)
     }
-    const refreshTherapists = () => { source.resetTherapists(); refresh() }
+    const refreshMetadata = () => {
+      if (!active) return
+      source.metadata.invalidate()
+      refresh()
+    }
+    const refreshTherapists = () => {
+      if (!active) return
+      resetTherapists = true
+      refreshMetadata()
+    }
     const onVisible = () => {
       if (document.visibilityState === 'visible') refreshTherapists()
     }
@@ -112,12 +133,12 @@ export function useSchedule(storeId: string | null, date: string) {
         // Render the committed event immediately; verify the rest in the background.
         refresh()
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_attendance', filter: `store_id=eq.${storeId}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_settings', filter: `store_id=eq.${storeId}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_attendance', filter: `store_id=eq.${storeId}` }, refreshMetadata)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_settings', filter: `store_id=eq.${storeId}` }, refreshMetadata)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'therapists', filter: `store_id=eq.${storeId}` }, refreshTherapists)
       .subscribe(status => {
         // Reconcile the fetch/subscription gap, including after a reconnect.
-        if (status === 'SUBSCRIBED') refresh()
+        if (status === 'SUBSCRIBED') refreshMetadata()
       })
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('online', onVisible)
@@ -133,9 +154,13 @@ export function useSchedule(storeId: string | null, date: string) {
   }, [source, storeId])
 
   const refresh = useCallback(() => {
-    if (storeId) void source.cache.load(date, true)
+    if (storeId) {
+      source.metadata.invalidate()
+      void source.cache.load(date, true)
+    }
   }, [source, storeId, date])
   const update = useCallback((updater: Parameters<ScheduleCache['update']>[1]) => {
+    source.metadata.invalidate()
     source.cache.update(date, updater)
   }, [source, date])
   const read = useCallback(() => source.cache.getSnapshot(date).data, [source, date])
